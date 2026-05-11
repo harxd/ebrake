@@ -9,9 +9,12 @@ created_at | DATETIME | when job was created
 updated_at | DATETIME | when job was updated
 started_at | DATETIME | when job was started
 finished_at | DATETIME | when job was finished
+duration | INTEGER | time it took to complete in seconds
+savings | INTEGER | space saved in percentage
 input_path | TEXT | input file path
 output_path | TEXT | output file path
 priority | INTEGER | job priority
+category | TEXT | name of the preset category
 preset | TEXT | name of the .ebrake preset used
 error | TEXT | error message
 

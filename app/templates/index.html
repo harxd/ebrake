@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ebrake</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div style="padding: 1.5rem; font-weight: 700; color: var(--accent);">ebrake</div>
+            <nav class="nav">
+                <button class="active" onclick="tab('create')"><i data-lucide="circle-plus"></i> Create Job</button>
+                <button onclick="tab('jobs')"><i data-lucide="align-justify"></i> Jobs</button>
+                <button onclick="tab('profiles')"><i data-lucide="file-sliders"></i> Profiles</button>
+                <div class="nav-spacer"></div>
+                <button onclick="tab('settings')"><i data-lucide="settings"></i> Settings</button>
+            </nav>
+        </aside>
+
+        <main class="main">
+            <div class="content">
+                <div id="create" class="tab-content active">
+                    <div class="split-view">
+                        <div class="split-left">
+                            <div class="section-title">Source File</div>
+                            <div class="file-picker-container">
+                                <div class="browser-breadcrumbs" id="breadcrumbs">
+                                    <span class="breadcrumb-item">/media</span>
+                                </div>
+                                <div class="file-browser" id="file-browser">
+                                    <!-- Items will be injected by JS -->
+                                </div>
+                                
+                                <div class="form-group" style="margin-top: 1.5rem;">
+                                    <label>Selected Path</label>
+                                    <input class="input" placeholder="No file selected" id="selected-path" readonly>
+                                </div>
+                                <button class="btn" style="width: 100%; margin-top: auto;" id="add-job-btn" disabled>Add to Queue</button>
+                            </div>
+                        </div>
+
+                        <div class="split-right">
+                            <div class="section-title">Preset Overrides</div>
+                            <div class="scroll-area">
+                                <div class="form-group">
+                                    <label>Active Preset</label>
+                                    <select class="input"><option>Standard 1080p</option><option>Fast 720p</option></select>
+                                </div>
+
+                                <div class="option-group">
+                                    <div class="option-group-title"><i data-lucide="video"></i> Video</div>
+                                    <div class="option-grid">
+                                        <div class="form-group">
+                                            <label>Codec</label>
+                                            <select class="input"><option>libx264</option><option>libx265</option><option>av1</option></select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>CRF / Quality</label>
+                                            <input type="number" class="input" value="23">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Speed Preset</label>
+                                            <select class="input"><option>veryslow</option><option>slow</option><option selected>medium</option><option>fast</option></select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Extension</label>
+                                            <select class="input"><option>mp4</option><option>mkv</option></select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="option-group">
+                                    <div class="option-group-title"><i data-lucide="volume-2"></i> Audio</div>
+                                    <div class="option-grid">
+                                        <div class="form-group">
+                                            <label>Codec</label>
+                                            <select class="input"><option>aac</option><option>ac3</option><option>opus</option></select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Bitrate</label>
+                                            <select class="input"><option>128k</option><option selected>192k</option><option>256k</option><option>320k</option></select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="option-group">
+                                    <div class="option-group-title"><i data-lucide="terminal"></i> Custom Args</div>
+                                    <input class="input" placeholder='-movflags +faststart'>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="jobs" class="tab-content">
+                    <div class="table-controls" style="padding: 1.5rem 1rem 1rem 1rem;">
+                        <span style="font-size: 0.8rem; color: var(--dim); font-weight: 600; text-transform: uppercase;">status filter:</span>
+                        <div class="filter-group">
+                            <label class="filter-item"><input type="checkbox" value="pending" checked onchange="renderTable()"> pending</label>
+                            <label class="filter-item"><input type="checkbox" value="running" checked onchange="renderTable()"> running</label>
+                            <label class="filter-item"><input type="checkbox" value="completed" checked onchange="renderTable()"> completed</label>
+                            <label class="filter-item"><input type="checkbox" value="failed" checked onchange="renderTable()"> failed</label>
+                            <label class="filter-item"><input type="checkbox" value="cancelled" checked onchange="renderTable()"> cancelled</label>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="jobs-table">
+                            <colgroup id="table-cols"></colgroup>
+                            <thead><tr id="table-header"></tr></thead>
+                            <tbody id="jobs-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="profiles" class="tab-content" style="padding: 2rem;">
+                    <div class="list-item"><strong>Standard 1080p</strong><button class="btn" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">Edit</button></div>
+                </div>
+
+                <div id="settings" class="tab-content" style="padding: 2rem;">
+                    <div class="form-group"><label>Output Directory</label><input class="input" value="/Users/e/Videos/ebrake_output"></div>
+                </div>
+            </div>
+
+            <footer class="footer">
+                <div class="footer-filename">The_Last_of_Us_S01E03.mkv</div>
+                <div class="footer-percentage">42.8%</div>
+                <div class="footer-progress"><div class="footer-progress-bar" style="width: 42.8%;"></div></div>
+                <div class="footer-stats"><div>ETA:<span>00:41:43</span></div><div>Pos:<span>00:03:24</span></div><div>Elapsed:<span>00:15:03</span></div></div>
+            </footer>
+        </main>
+    </div>
+
+    <div id="header-context-menu" class="context-menu"></div>
+
+    <script>
+        const allColumns = [
+            { id: 'pos', label: '#', visible: true, width: 40 },
+            { id: 'priority', label: 'Priority', visible: true, width: 80 },
+            { id: 'filename', label: 'File Name', visible: true, width: 300 },
+            { id: 'status', label: 'status', visible: true, width: 120 },
+            { id: 'duration', label: 'Duration', visible: true, width: 100 },
+            { id: 'savings', label: 'Savings', visible: true, width: 100 },
+            { id: 'created_at', label: 'Created At', visible: false, width: 150 },
+            { id: 'updated_at', label: 'Updated At', visible: false, width: 150 },
+            { id: 'started_at', label: 'Started At', visible: false, width: 150 },
+            { id: 'finished_at', label: 'Finished At', visible: false, width: 150 },
+            { id: 'input_path', label: 'Input Path', visible: false, width: 400 },
+            { id: 'output_path', label: 'Output Path', visible: false, width: 400 },
+            { id: 'preset', label: 'Preset', visible: false, width: 150 },
+            { id: 'error', label: 'Error', visible: false, width: 300 }
+        ];
+
+        let jobsData = [
+            { id: 1, priority: 1, filename: 'Succession.S04E10.mkv', status: 'pending', created_at: '2026-05-08 10:00', input_path: '/media/Succession.S04E10.mkv', preset: 'Standard 1080p' },
+            { id: 2, priority: 2, filename: 'Barry.S04E08.mkv', status: 'completed', duration: '00:45:12', savings: '34%', created_at: '2026-05-08 09:00', input_path: '/media/Barry.S04E08.mkv', preset: 'Fast 720p' },
+            { id: 3, priority: 1, filename: 'The_Last_of_Us_S01E03.mkv', status: 'running', created_at: '2026-05-08 11:00', input_path: '/media/The_Last_of_Us_S01E03.mkv', preset: 'Standard 1080p' }
+        ];
+
+        const tabMap = {
+            'create': '/create',
+            'jobs': '/jobs',
+            'profiles': '/profiles',
+            'settings': '/settings'
+        };
+
+        function tab(id, pushState = true) {
+            // Only hide content and headers, NOT navigation buttons
+            document.querySelectorAll('.tab-content, .tab-header').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.nav button').forEach(el => el.classList.remove('active'));
+            
+            const content = document.getElementById(id);
+            if (content) {
+                content.style.display = (id === 'jobs') ? 'flex' : 'block';
+                content.classList.add('active');
+            }
+            
+            const header = document.getElementById(id + '-header');
+            if (header) header.style.display = 'block';
+            
+            // Highlight active button
+            const btn = Array.from(document.querySelectorAll('.nav button')).find(b => b.getAttribute('onclick').includes(`'${id}'`));
+            if (btn) btn.classList.add('active');
+
+            if (id === 'jobs') renderTable();
+
+            // Update URL
+            if (pushState && tabMap[id]) {
+                history.pushState({ tabId: id }, '', tabMap[id]);
+            }
+        }
+
+        // Handle Back/Forward buttons
+        window.onpopstate = function(event) {
+            if (event.state && event.state.tabId) {
+                tab(event.state.tabId, false);
+            } else {
+                initFromPath();
+            }
+        };
+
+        function initFromPath() {
+            const path = window.location.pathname;
+            const tabId = Object.keys(tabMap).find(key => tabMap[key] === path) || 'create';
+            tab(tabId, false);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            initFromPath();
+            browse(''); // Initialize file browser at root
+        });
+
+        let currentBrowserPath = '';
+        async function browse(relPath) {
+            currentBrowserPath = relPath;
+            const res = await fetch(`/api/files?path=${encodeURIComponent(relPath)}`);
+            const data = await res.json();
+            
+            if (data.error) {
+                console.error(data.error);
+                return;
+            }
+
+            renderBreadcrumbs(relPath);
+            const browser = document.getElementById('file-browser');
+            browser.innerHTML = data.items.map(item => `
+                <div class="browser-item ${item.is_dir ? 'dir' : 'file'}" onclick="${item.is_dir ? `browse('${item.path.replace(/\\/g, '/')}')` : `selectFile('${item.path.replace(/\\/g, '/')}')`}">
+                    <i data-lucide="${item.is_dir ? 'folder' : 'file-video'}"></i>
+                    <span>${item.name}</span>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function renderBreadcrumbs(path) {
+            const container = document.getElementById('breadcrumbs');
+            const parts = path.split('/').filter(p => p);
+            let html = `<span class="breadcrumb-item" onclick="browse('')">/media</span>`;
+            let current = '';
+            parts.forEach((p, i) => {
+                current += (i === 0 ? '' : '/') + p;
+                html += ` <span class="breadcrumb-separator">/</span> <span class="breadcrumb-item" onclick="browse('${current}')">${p}</span>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function selectFile(path) {
+            document.querySelectorAll('.browser-item').forEach(el => el.classList.remove('selected'));
+            event.currentTarget.classList.add('selected');
+            document.getElementById('selected-path').value = '/media/' + path;
+            document.getElementById('add-job-btn').disabled = false;
+        }
+
+        let sortCol = null; // Default to position sorting
+        let sortDir = 'asc';
+
+        const statusRank = {
+            'cancelled': 0,
+            'completed': 1,
+            'failed': 2,
+            'running': 3,
+            'pending': 4
+        };
+
+        function toggleSort(colId) {
+            if (colId === 'pos') {
+                sortCol = null;
+                renderTable();
+                return;
+            }
+
+            if (sortCol === colId) {
+                if (sortDir === 'asc') {
+                    sortDir = 'desc';
+                } else {
+                    sortCol = null; // 3rd click: Reset to default
+                }
+            } else {
+                sortCol = colId;
+                sortDir = 'asc';
+            }
+            renderTable();
+        }
+
+        function renderTable() {
+            const cols = document.getElementById('table-cols');
+            const header = document.getElementById('table-header');
+            const body = document.getElementById('jobs-body');
+            const table = document.getElementById('jobs-table');
+            const visibleCols = allColumns.filter(c => c.visible);
+
+            cols.innerHTML = visibleCols.map(col => `<col id="col-${col.id}" style="width: ${col.width}px;">`).join('');
+            
+            const totalWidth = visibleCols.reduce((sum, c) => sum + c.width, 0);
+            table.style.width = totalWidth + 'px';
+
+            header.innerHTML = visibleCols.map((col, index) => {
+                const isSorted = sortCol === col.id;
+                const icon = isSorted ? (sortDir === 'asc' ? '<i data-lucide="chevron-up" style="width:12px; height:12px;"></i>' : '<i data-lucide="chevron-down" style="width:12px; height:12px;"></i>') : '';
+                
+                return `
+                <th style="position: relative;"
+                    draggable="true" 
+                    ondragstart="handleDragStart(event, ${index})" 
+                    ondragover="handleDragOver(event)" 
+                    ondrop="handleDrop(event, ${index})"
+                    oncontextmenu="showHeaderMenu(event)"
+                    onclick="toggleSort('${col.id}')">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden; text-overflow: ellipsis;">
+                        <span>${col.label}</span>
+                        ${icon}
+                    </div>
+                    <div class="resizer" onmousedown="initResize(event, '${col.id}')"></div>
+                </th>
+                `;
+            }).join('');
+
+            const selectedStatuses = Array.from(document.querySelectorAll('.filter-item input:checked')).map(cb => cb.value);
+            
+            // Primary compare function
+            const compare = (a, b, col, dir) => {
+                let valA = a[col];
+                let valB = b[col];
+                if (col === 'status') {
+                    valA = statusRank[a.status];
+                    valB = statusRank[b.status];
+                }
+                if (valA < valB) return dir === 'asc' ? -1 : 1;
+                if (valA > valB) return dir === 'asc' ? 1 : -1;
+                return 0;
+            };
+
+            // Secondary / Default sort: Priority (DESC), then Created At (ASC)
+            const defaultCompare = (a, b) => {
+                if (a.priority > b.priority) return -1;
+                if (a.priority < b.priority) return 1;
+                if (a.created_at < b.created_at) return -1;
+                if (a.created_at > b.created_at) return 1;
+                return 0;
+            };
+
+            const filteredData = jobsData.filter(j => selectedStatuses.includes(j.status))
+                .sort((a, b) => {
+                    if (sortCol) {
+                        const res = compare(a, b, sortCol, sortDir);
+                        return res !== 0 ? res : defaultCompare(a, b);
+                    }
+                    return defaultCompare(a, b);
+                });
+
+            body.innerHTML = filteredData.map((job, idx) => `
+                <tr data-job-id="${job.id || ''}">
+                    ${visibleCols.map(col => {
+                        if (col.id === 'pos') return `<td>${idx + 1}</td>`;
+                        if (col.id === 'priority') {
+                            return `<td ondblclick="startPriorityEdit(this, ${job.id})">${job[col.id]}</td>`;
+                        }
+                        return `<td>${job[col.id] || '-'}</td>`;
+                    }).join('')}
+                </tr>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function startPriorityEdit(td, jobId) {
+            if (td.querySelector('input')) return;
+            const oldValue = td.innerText;
+            td.innerHTML = `<input type="number" class="input" style="padding: 0.2rem 0.4rem; font-size: 0.85rem;" value="${oldValue}" min="0">`;
+            const input = td.querySelector('input');
+            input.focus();
+            input.select();
+
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') savePriority(td, jobId, input.value);
+                if (e.key === 'Escape') renderTable();
+            };
+            input.onblur = () => savePriority(td, jobId, input.value);
+        }
+
+        function savePriority(td, jobId, newValue) {
+            const job = jobsData.find(j => j.id == jobId);
+            if (job) {
+                job.priority = Math.max(0, parseInt(newValue) || 0);
+            }
+            renderTable();
+        }
+
+        let startX, startWidth, resizableColId;
+        function initResize(e, colId) {
+            e.stopPropagation(); e.preventDefault();
+            const col = allColumns.find(c => c.id === colId);
+            resizableColId = colId;
+            startX = e.pageX;
+            startWidth = col.width;
+            document.addEventListener('mousemove', doResize);
+            document.addEventListener('mouseup', stopResize);
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        }
+
+        function doResize(e) {
+            const diff = e.pageX - startX;
+            const colObj = allColumns.find(c => c.id === resizableColId);
+            const newWidth = Math.max(50, startWidth + diff); 
+            
+            if (colObj.width !== newWidth) {
+                colObj.width = newWidth;
+                
+                const colEl = document.getElementById(`col-${resizableColId}`);
+                if (colEl) colEl.style.width = newWidth + 'px';
+                
+                const table = document.getElementById('jobs-table');
+                const totalWidth = allColumns
+                    .filter(c => c.visible)
+                    .reduce((sum, c) => sum + c.width, 0);
+                    
+                table.style.width = totalWidth + 'px';
+            }
+        }
+        function stopResize() {
+            document.removeEventListener('mousemove', doResize);
+            document.removeEventListener('mouseup', stopResize);
+            document.body.style.cursor = 'default';
+            document.body.style.userSelect = 'auto';
+            // No need to re-render everything, we already updated the DOM
+        }
+
+        function handleDragStart(e, index) { e.dataTransfer.setData('text/plain', index); e.target.classList.add('dragging'); }
+        function handleDragOver(e) { e.preventDefault(); }
+        function handleDrop(e, targetIndex) {
+            e.preventDefault();
+            const srcIndex = parseInt(e.dataTransfer.getData('text/plain'));
+            const visibleIndices = allColumns.map((c, i) => c.visible ? i : -1).filter(i => i !== -1);
+            const [movedCol] = allColumns.splice(visibleIndices[srcIndex], 1);
+            allColumns.splice(visibleIndices[targetIndex], 0, movedCol);
+            renderTable();
+        }
+
+        function showHeaderMenu(e) {
+            e.preventDefault();
+            const menu = document.getElementById('header-context-menu');
+            menu.style.display = 'block';
+            menu.style.left = `${e.pageX}px`; menu.style.top = `${e.pageY}px`;
+            menu.innerHTML = allColumns.map(col => `
+                <div class="menu-item" onclick="toggleColumn('${col.id}')">
+                    <input type="checkbox" ${col.visible ? 'checked' : ''} onclick="event.stopPropagation()">
+                    ${col.label}
+                </div>
+            `).join('');
+            const closeMenu = () => { menu.style.display = 'none'; document.removeEventListener('click', closeMenu); };
+            setTimeout(() => document.addEventListener('click', closeMenu), 10);
+        }
+        function toggleColumn(id) { const col = allColumns.find(c => c.id === id); col.visible = !col.visible; renderTable(); }
+        document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); renderTable(); });
+    </script>
+</body>
+</html>
