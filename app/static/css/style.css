@@ -158,3 +158,31 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 .option-group { margin-bottom: 2rem; }
 .option-group-title { font-size: 0.85rem; font-weight: 600; color: var(--accent); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
 .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+/* Tree Styles */
+.tree { display: flex; flex-direction: column; gap: 0.25rem; }
+.tree-node { display: flex; flex-direction: column; }
+.tree-item { 
+    display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.6rem; 
+    border-radius: 4px; cursor: pointer; font-size: 0.85rem; transition: 0.1s;
+}
+.tree-item:hover { background: rgba(255,255,255,0.05); }
+.tree-item.active { background: rgba(59, 130, 246, 0.1); color: var(--accent); }
+.tree-item i { width: 16px; height: 16px; opacity: 0.6; }
+.tree-item.dir i { color: #facc15; opacity: 1; }
+.tree-children { padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem; }
+
+.tree-node.drag-target { border: 2px dashed var(--accent); border-radius: 6px; background: rgba(59, 130, 246, 0.05); }
+
+/* Toggle Buttons */
+.toggle-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.toggle-btn { 
+    background: var(--card); border: 1px solid var(--border); color: var(--dim); 
+    padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; 
+    font-weight: 600; transition: 0.2s; 
+}
+.toggle-btn:hover { border-color: var(--accent); }
+.toggle-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+
+

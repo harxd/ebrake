@@ -1,0 +1,16 @@
+[output]
+suffix = ""
+container = "mkv"
+
+[video]
+codec = "libx264"
+preset = ""
+crf = "23"
+tune = "0"
+pix_fmt = "yuv420p10le"
+fps_mode = "cfr"
+
+[audio]
+fallback_codec = "ac3"
+fallback_bitrate = "96k"
+passthrough_codecs = "aac,ac3,eac3"

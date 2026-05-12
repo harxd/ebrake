@@ -7,6 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='hammock.ico') }}">
 </head>
 <body>
     <div class="app">
@@ -46,50 +47,104 @@
                         <div class="split-right">
                             <div class="section-title">Preset Overrides</div>
                             <div class="scroll-area">
-                                <div class="form-group">
-                                    <label>Active Preset</label>
-                                    <select class="input"><option>Standard 1080p</option><option>Fast 720p</option></select>
+                                <div class="option-grid" style="margin-bottom: 2rem;">
+                                    <div class="form-group">
+                                        <label>Category</label>
+                                        <select class="input" id="job-category" onchange="updateJobPresetDropdown()"></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Preset</label>
+                                        <select class="input" id="job-preset" onchange="loadJobPresetSettings()"></select>
+                                    </div>
                                 </div>
 
                                 <div class="option-group">
-                                    <div class="option-group-title"><i data-lucide="video"></i> Video</div>
+                                    <div class="option-group-title"><i data-lucide="package"></i> Output Formatting</div>
+                                    <div class="option-grid">
+                                        <div class="form-group">
+                                            <label>Output Suffix</label>
+                                            <input class="input" id="job-field-output_suffix">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Container</label>
+                                            <select class="input" id="job-field-output_container">
+                                                <option value="mkv">mkv</option>
+                                                <option value="mp4">mp4</option>
+                                                <option value="webm">webm</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="option-group">
+                                    <div class="option-group-title"><i data-lucide="video"></i> Video Encoding</div>
                                     <div class="option-grid">
                                         <div class="form-group">
                                             <label>Codec</label>
-                                            <select class="input"><option>libx264</option><option>libx265</option><option>av1</option></select>
+                                            <select class="input" id="job-field-video_codec">
+                                                <option value="libsvtav1">libsvtav1</option>
+                                                <option value="libx264">libx264</option>
+                                                <option value="libx265">libx265</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Preset</label>
+                                            <input class="input" id="job-field-video_preset">
                                         </div>
                                         <div class="form-group">
                                             <label>CRF / Quality</label>
-                                            <input type="number" class="input" value="23">
+                                            <input type="number" class="input" id="job-field-video_crf">
                                         </div>
                                         <div class="form-group">
-                                            <label>Speed Preset</label>
-                                            <select class="input"><option>veryslow</option><option>slow</option><option selected>medium</option><option>fast</option></select>
+                                            <label>Visual Tune</label>
+                                            <select class="input" id="job-field-video_tune">
+                                                <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                                            </select>
                                         </div>
                                         <div class="form-group">
-                                            <label>Extension</label>
-                                            <select class="input"><option>mp4</option><option>mkv</option></select>
+                                            <label>Pixel Format</label>
+                                            <select class="input" id="job-field-video_pix_fmt">
+                                                <option value="yuv420p10le">yuv420p10le</option>
+                                                <option value="yuv420p">yuv420p</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>FPS Mode</label>
+                                            <select class="input" id="job-field-video_fps_mode">
+                                                <option value="cfr">cfr</option><option value="vfr">vfr</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div class="option-group">
-                                    <div class="option-group-title"><i data-lucide="volume-2"></i> Audio</div>
+                                    <div class="option-group-title"><i data-lucide="volume-2"></i> Audio Encoding</div>
+                                    <div class="form-group">
+                                        <label>Passthrough Codecs</label>
+                                        <div class="toggle-group" id="job-field-audio_passthrough_codecs">
+                                            <button class="toggle-btn" onclick="toggleCodec(this, 'aac')">aac</button>
+                                            <button class="toggle-btn" onclick="toggleCodec(this, 'ac3')">ac3</button>
+                                            <button class="toggle-btn" onclick="toggleCodec(this, 'eac3')">eac3</button>
+                                            <button class="toggle-btn" onclick="toggleCodec(this, 'dts')">dts</button>
+                                            <button class="toggle-btn" onclick="toggleCodec(this, 'flac')">flac</button>
+                                            <button class="toggle-btn" onclick="toggleCodec(this, 'truehd')">truehd</button>
+                                            <button class="toggle-btn" onclick="toggleCodec(this, 'opus')">opus</button>
+                                        </div>
+                                    </div>
                                     <div class="option-grid">
                                         <div class="form-group">
-                                            <label>Codec</label>
-                                            <select class="input"><option>aac</option><option>ac3</option><option>opus</option></select>
+                                            <label>Fallback Codec</label>
+                                            <select class="input" id="job-field-audio_fallback_codec">
+                                                <option value="libopus">libopus</option><option value="libmp3lame">libmp3lame</option><option value="ac3">ac3</option><option value="flac">flac</option><option value="aac">aac</option>
+                                            </select>
                                         </div>
                                         <div class="form-group">
-                                            <label>Bitrate</label>
-                                            <select class="input"><option>128k</option><option selected>192k</option><option>256k</option><option>320k</option></select>
+                                            <label>Fallback Bitrate</label>
+                                            <select class="input" id="job-field-audio_fallback_bitrate">
+                                                <option value="96k">96k</option><option value="128k">128k</option><option value="192k">192k</option><option value="256k">256k</option><option value="320k">320k</option>
+                                            </select>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div class="option-group">
-                                    <div class="option-group-title"><i data-lucide="terminal"></i> Custom Args</div>
-                                    <input class="input" placeholder='-movflags +faststart'>
                                 </div>
                             </div>
                         </div>
@@ -116,8 +171,132 @@
                     </div>
                 </div>
 
-                <div id="profiles" class="tab-content" style="padding: 2rem;">
-                    <div class="list-item"><strong>Standard 1080p</strong><button class="btn" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">Edit</button></div>
+                <div id="profiles" class="tab-content">
+                    <div class="split-view">
+                        <div class="split-left" style="width: 300px; flex: none;">
+                            <div class="section-title">Profile Categories</div>
+                            <div class="scroll-area" id="profile-tree" oncontextmenu="showContextMenu(event, [{ label: 'Add Category', icon: 'folder-plus', onclick: 'promptCreateDir(\'\')' }])">
+                                <!-- Tree will be injected here -->
+                            </div>
+                        </div>
+                        <div class="split-right">
+                            <div id="profile-details-empty" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--dim);">
+                                <i data-lucide="file-sliders" style="width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.2;"></i>
+                                <p>Select a profile to edit</p>
+                            </div>
+                            <div id="profile-editor" style="display: none; flex: 1; flex-direction: column; height: 100%; overflow: hidden;">
+                                <div class="section-title" id="profile-title">Profile Settings</div>
+                                <div class="scroll-area">
+                                    <div class="form-group">
+                                        <label>Profile Name</label>
+                                        <input class="input" id="profile-name-input">
+                                    </div>
+
+                                    <div class="option-group">
+                                        <div class="option-group-title"><i data-lucide="package"></i> Output Formatting</div>
+                                        <div class="option-grid">
+                                            <div class="form-group">
+                                                <label title="Appended to the original filename (e.g. video [RF23-2].mkv). Leave empty to auto-append a number if conflict exists.">Output Suffix</label>
+                                                <input class="input" id="field-output_suffix" placeholder='e.g. [AV1-10bit]'>
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Container</label>
+                                                <select class="input" id="field-output_container">
+                                                    <option value="mkv">mkv</option>
+                                                    <option value="mp4">mp4</option>
+                                                    <option value="webm">webm</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="option-group">
+                                        <div class="option-group-title"><i data-lucide="video"></i> Video Encoding (SVT-AV1)</div>
+                                        <div class="option-grid">
+                                            <div class="form-group">
+                                                <label>Codec</label>
+                                                <select class="input" id="field-video_codec">
+                                                    <option value="libsvtav1">libsvtav1 (AV1)</option>
+                                                    <option value="libx264">libx264 (H264)</option>
+                                                    <option value="libx265">libx265 (HEVC)</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label title="Preset speed. SVT-AV1: 0-13 (0 is slowest). x264/x265: ultrafast to veryslow">Preset</label>
+                                                <input class="input" id="field-video_preset" placeholder="2">
+                                            </div>
+                                            <div class="form-group">
+                                                <label title="Constant Rate Factor. Lower = better quality/larger file. Typical: 18-28.">CRF / Quality</label>
+                                                <input type="number" class="input" id="field-video_crf" value="23">
+                                            </div>
+                                            <div class="form-group">
+                                                <label title="SVT-AV1 options: 0 (Visual), 1 (PSNR), 2 (SSIM), 3 (Subjective)">Visual Tune</label>
+                                                <select class="input" id="field-video_tune">
+                                                    <option value="0">0 (Visual Quality)</option>
+                                                    <option value="1">1 (PSNR)</option>
+                                                    <option value="2">2 (SSIM)</option>
+                                                    <option value="3">3 (Subjective)</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Pixel Format</label>
+                                                <select class="input" id="field-video_pix_fmt">
+                                                    <option value="yuv420p10le">yuv420p10le (10-bit)</option>
+                                                    <option value="yuv420p">yuv420p (8-bit)</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label>FPS Mode</label>
+                                                <select class="input" id="field-video_fps_mode">
+                                                    <option value="cfr">cfr (Constant)</option>
+                                                    <option value="vfr">vfr (Variable)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="option-group">
+                                        <div class="option-group-title"><i data-lucide="volume-2"></i> Audio Encoding</div>
+                                        <div class="form-group">
+                                            <label title="Select audio codecs to copy directly without re-encoding">Passthrough Codecs</label>
+                                            <div class="toggle-group" id="field-audio_passthrough_codecs">
+                                                <button class="toggle-btn" onclick="toggleCodec(this, 'aac')">aac</button>
+                                                <button class="toggle-btn" onclick="toggleCodec(this, 'ac3')">ac3</button>
+                                                <button class="toggle-btn" onclick="toggleCodec(this, 'eac3')">eac3</button>
+                                                <button class="toggle-btn" onclick="toggleCodec(this, 'dts')">dts</button>
+                                                <button class="toggle-btn" onclick="toggleCodec(this, 'flac')">flac</button>
+                                                <button class="toggle-btn" onclick="toggleCodec(this, 'truehd')">truehd</button>
+                                                <button class="toggle-btn" onclick="toggleCodec(this, 'opus')">opus</button>
+                                            </div>
+                                        </div>
+                                        <div class="option-grid">
+                                            <div class="form-group">
+                                                <label>Fallback Codec</label>
+                                                <select class="input" id="field-audio_fallback_codec">
+                                                    <option value="libopus">libopus</option>
+                                                    <option value="libmp3lame">libmp3lame</option>
+                                                    <option value="ac3">ac3</option>
+                                                    <option value="flac">flac</option>
+                                                    <option value="aac">aac</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Fallback Bitrate</label>
+                                                <select class="input" id="field-audio_fallback_bitrate">
+                                                    <option value="96k">96k</option>
+                                                    <option value="128k">128k</option>
+                                                    <option value="192k">192k</option>
+                                                    <option value="256k">256k</option>
+                                                    <option value="320k">320k</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button class="btn" style="width: 100%; margin-top: 2rem;" onclick="saveProfile()">Save Changes</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="settings" class="tab-content" style="padding: 2rem;">
@@ -134,12 +313,11 @@
         </main>
     </div>
 
-    <div id="header-context-menu" class="context-menu"></div>
+    <div id="context-menu" class="context-menu"></div>
 
     <script>
         const allColumns = [
             { id: 'pos', label: '#', visible: true, width: 40 },
-            { id: 'priority', label: 'Priority', visible: true, width: 80 },
             { id: 'filename', label: 'File Name', visible: true, width: 300 },
             { id: 'status', label: 'status', visible: true, width: 120 },
             { id: 'duration', label: 'Duration', visible: true, width: 100 },
@@ -155,9 +333,9 @@
         ];
 
         let jobsData = [
-            { id: 1, priority: 1, filename: 'Succession.S04E10.mkv', status: 'pending', created_at: '2026-05-08 10:00', input_path: '/media/Succession.S04E10.mkv', preset: 'Standard 1080p' },
-            { id: 2, priority: 2, filename: 'Barry.S04E08.mkv', status: 'completed', duration: '00:45:12', savings: '34%', created_at: '2026-05-08 09:00', input_path: '/media/Barry.S04E08.mkv', preset: 'Fast 720p' },
-            { id: 3, priority: 1, filename: 'The_Last_of_Us_S01E03.mkv', status: 'running', created_at: '2026-05-08 11:00', input_path: '/media/The_Last_of_Us_S01E03.mkv', preset: 'Standard 1080p' }
+            { id: 1, filename: 'Succession.S04E10.mkv', status: 'pending', created_at: '2026-05-08 10:00', input_path: '/media/Succession.S04E10.mkv', preset: 'Standard 1080p' },
+            { id: 2, filename: 'Barry.S04E08.mkv', status: 'completed', duration: '00:45:12', savings: '34%', created_at: '2026-05-08 09:00', input_path: '/media/Barry.S04E08.mkv', preset: 'Fast 720p' },
+            { id: 3, filename: 'The_Last_of_Us_S01E03.mkv', status: 'running', created_at: '2026-05-08 11:00', input_path: '/media/The_Last_of_Us_S01E03.mkv', preset: 'Standard 1080p' }
         ];
 
         const tabMap = {
@@ -174,7 +352,7 @@
             
             const content = document.getElementById(id);
             if (content) {
-                content.style.display = (id === 'jobs') ? 'flex' : 'block';
+                content.style.display = (id === 'jobs' || id === 'profiles') ? 'flex' : 'block';
                 content.classList.add('active');
             }
             
@@ -186,6 +364,7 @@
             if (btn) btn.classList.add('active');
 
             if (id === 'jobs') renderTable();
+            if (id === 'profiles') loadProfiles();
 
             // Update URL
             if (pushState && tabMap[id]) {
@@ -212,7 +391,83 @@
             lucide.createIcons();
             initFromPath();
             browse(''); // Initialize file browser at root
+            initJobPresets();
         });
+
+        let profileDataTree = [];
+
+        async function initJobPresets() {
+            const res = await fetch('/api/profiles');
+            const data = await res.json();
+            profileDataTree = data.tree;
+            
+            const catSelect = document.getElementById('job-category');
+            catSelect.innerHTML = profileDataTree.map(node => `<option value="${node.name}">${node.name}</option>`).join('');
+            updateJobPresetDropdown();
+        }
+
+        function updateJobPresetDropdown() {
+            const catName = document.getElementById('job-category').value;
+            const catNode = profileDataTree.find(n => n.name === catName);
+            const presetSelect = document.getElementById('job-preset');
+            if (catNode && catNode.children) {
+                presetSelect.innerHTML = catNode.children
+                    .filter(c => c.type === 'file')
+                    .map(c => `<option value="${c.path}">${c.name.replace(/\.(ebrake|toml)$/, '')}</option>`).join('');
+            } else {
+                presetSelect.innerHTML = '';
+            }
+            loadJobPresetSettings();
+        }
+
+        async function loadJobPresetSettings() {
+            const path = document.getElementById('job-preset').value;
+            if (!path) return;
+
+            const res = await fetch(`/api/profiles/read?path=${encodeURIComponent(path)}`);
+            const data = await res.json();
+            if (data.error) return;
+
+            const config = parseTOML(data.content);
+            const fields = [
+                'output_suffix', 'output_container', 
+                'video_codec', 'video_preset', 'video_crf', 'video_tune', 'video_pix_fmt', 'video_fps_mode',
+                'audio_passthrough_codecs', 'audio_fallback_codec', 'audio_fallback_bitrate'
+            ];
+            
+            fields.forEach(f => {
+                const el = document.getElementById(`job-field-${f}`);
+                if (!el || config[f] === undefined) return;
+                
+                if (f === 'audio_passthrough_codecs') {
+                    const activeCodecs = config[f].split(',').map(s => s.trim());
+                    el.querySelectorAll('.toggle-btn').forEach(btn => {
+                        const codec = btn.innerText;
+                        btn.classList.toggle('active', activeCodecs.includes(codec));
+                    });
+                } else {
+                    el.value = config[f];
+                }
+            });
+        }
+
+        function parseTOML(content) {
+            const lines = content.split('\n');
+            const config = {};
+            let currentSection = '';
+
+            lines.forEach(line => {
+                line = line.trim();
+                if (!line || line.startsWith('#')) return;
+                const sectionMatch = line.match(/^\[(.*)\]$/);
+                if (sectionMatch) { currentSection = sectionMatch[1]; return; }
+                const match = line.match(/^([a-z0-9_]+)\s*=\s*"(.*)"/);
+                if (match) { config[currentSection ? `${currentSection}_${match[1]}` : match[1]] = match[2]; }
+                const matchNum = line.match(/^([a-z0-9_]+)\s*=\s*([0-9.]+)/);
+                if (matchNum) { config[currentSection ? `${currentSection}_${match[1]}` : match[1]] = matchNum[2]; }
+            });
+            return config;
+        }
 
         let currentBrowserPath = '';
         async function browse(relPath) {
@@ -334,12 +589,10 @@
                 return 0;
             };
 
-            // Secondary / Default sort: Priority (DESC), then Created At (ASC)
+            // Secondary / Default sort: Created At (DESC) - newest first
             const defaultCompare = (a, b) => {
-                if (a.priority > b.priority) return -1;
-                if (a.priority < b.priority) return 1;
-                if (a.created_at < b.created_at) return -1;
-                if (a.created_at > b.created_at) return 1;
+                if (a.created_at > b.created_at) return -1;
+                if (a.created_at < b.created_at) return 1;
                 return 0;
             };
 
@@ -356,9 +609,6 @@
                 <tr data-job-id="${job.id || ''}">
                     ${visibleCols.map(col => {
                         if (col.id === 'pos') return `<td>${idx + 1}</td>`;
-                        if (col.id === 'priority') {
-                            return `<td ondblclick="startPriorityEdit(this, ${job.id})">${job[col.id]}</td>`;
-                        }
                         return `<td>${job[col.id] || '-'}</td>`;
                     }).join('')}
                 </tr>
@@ -366,28 +616,7 @@
             lucide.createIcons();
         }
 
-        function startPriorityEdit(td, jobId) {
-            if (td.querySelector('input')) return;
-            const oldValue = td.innerText;
-            td.innerHTML = `<input type="number" class="input" style="padding: 0.2rem 0.4rem; font-size: 0.85rem;" value="${oldValue}" min="0">`;
-            const input = td.querySelector('input');
-            input.focus();
-            input.select();
 
-            input.onkeydown = (e) => {
-                if (e.key === 'Enter') savePriority(td, jobId, input.value);
-                if (e.key === 'Escape') renderTable();
-            };
-            input.onblur = () => savePriority(td, jobId, input.value);
-        }
-
-        function savePriority(td, jobId, newValue) {
-            const job = jobsData.find(j => j.id == jobId);
-            if (job) {
-                job.priority = Math.max(0, parseInt(newValue) || 0);
-            }
-            renderTable();
-        }
 
         let startX, startWidth, resizableColId;
         function initResize(e, colId) {
@@ -440,21 +669,252 @@
             renderTable();
         }
 
-        function showHeaderMenu(e) {
+        function showContextMenu(e, items) {
             e.preventDefault();
-            const menu = document.getElementById('header-context-menu');
+            e.stopPropagation();
+            const menu = document.getElementById('context-menu');
             menu.style.display = 'block';
             menu.style.left = `${e.pageX}px`; menu.style.top = `${e.pageY}px`;
-            menu.innerHTML = allColumns.map(col => `
-                <div class="menu-item" onclick="toggleColumn('${col.id}')">
-                    <input type="checkbox" ${col.visible ? 'checked' : ''} onclick="event.stopPropagation()">
-                    ${col.label}
+            menu.innerHTML = items.map(item => `
+                <div class="menu-item" onclick="${item.onclick}">
+                    <i data-lucide="${item.icon}" style="width:14px; height:14px;"></i>
+                    ${item.label}
                 </div>
             `).join('');
+            lucide.createIcons();
             const closeMenu = () => { menu.style.display = 'none'; document.removeEventListener('click', closeMenu); };
             setTimeout(() => document.addEventListener('click', closeMenu), 10);
         }
+
+        function showHeaderMenu(e) {
+            const items = allColumns.map(col => ({
+                label: col.label,
+                icon: col.visible ? 'check-square' : 'square',
+                onclick: `toggleColumn('${col.id}')`
+            }));
+            showContextMenu(e, items);
+        }
+        
         function toggleColumn(id) { const col = allColumns.find(c => c.id === id); col.visible = !col.visible; renderTable(); }
+        async function loadProfiles() {
+            const res = await fetch('/api/profiles');
+            const data = await res.json();
+            const container = document.getElementById('profile-tree');
+            container.innerHTML = `<div class="tree">${renderProfileTree(data.tree)}</div>`;
+            lucide.createIcons();
+        }
+
+        function renderProfileTree(nodes, parentPath = '') {
+            return nodes.map(node => {
+                const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name;
+                if (node.type === 'dir') {
+                    const ctxItems = [
+                        { label: 'Add Category', icon: 'folder-plus', onclick: `promptCreateDir('${fullPath}')` },
+                        { label: 'Add Profile', icon: 'file-plus', onclick: `promptCreateFile('${fullPath}')` },
+                        { label: 'Delete Category', icon: 'trash-2', onclick: `deletePath('${fullPath}')` }
+                    ];
+                    return `
+                        <div class="tree-node" 
+                             ondragover="handleProfileDragOver(event)" 
+                             ondragleave="handleProfileDragLeave(event)" 
+                             ondrop="handleProfileDrop(event, '${fullPath}')">
+                            <div class="tree-item dir" 
+                                 onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'flex' : 'none'"
+                                 oncontextmenu="showContextMenu(event, ${JSON.stringify(ctxItems).replace(/"/g, '&quot;')})">
+                                <i data-lucide="folder"></i>
+                                <span>${node.name}</span>
+                            </div>
+                            <div class="tree-children">
+                                ${renderProfileTree(node.children, fullPath)}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    const parentDir = parentPath;
+                    const ctxItems = [
+                        { label: 'Add Category', icon: 'folder-plus', onclick: `promptCreateDir('${parentDir}')` },
+                        { label: 'Add Profile', icon: 'file-plus', onclick: `promptCreateFile('${parentDir}')` },
+                        { label: 'Delete Profile', icon: 'trash-2', onclick: `deletePath('${node.path}')` }
+                    ];
+                    const cleanName = node.name.replace(/\.(ebrake|toml)$/, '');
+                    return `
+                        <div class="tree-item file" 
+                             draggable="true"
+                             ondragstart="handleProfileDragStart(event, '${node.path}')"
+                             onclick="selectProfile('${node.path}', '${cleanName}')" 
+                             data-path="${node.path}"
+                             oncontextmenu="showContextMenu(event, ${JSON.stringify(ctxItems).replace(/"/g, '&quot;')})">
+                            <i data-lucide="file-text"></i>
+                            <span>${cleanName}</span>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        async function selectProfile(path, name) {
+            document.querySelectorAll('.tree-item.file').forEach(el => el.classList.remove('active'));
+            const activeItem = document.querySelector(`.tree-item.file[data-path="${path}"]`);
+            if (activeItem) activeItem.classList.add('active');
+
+            document.getElementById('profile-details-empty').style.display = 'none';
+            document.getElementById('profile-editor').style.display = 'flex';
+            document.getElementById('profile-title').innerText = name;
+            document.getElementById('profile-name-input').value = name;
+            
+            const res = await fetch(`/api/profiles/read?path=${encodeURIComponent(path)}`);
+            const data = await res.json();
+            
+            if (data.error) {
+                alert(`Error loading profile: ${data.error}`);
+                return;
+            }
+
+            const config = parseTOML(data.content);
+
+            // Map fields to UI
+            const fields = [
+                'output_suffix', 'output_container', 
+                'video_codec', 'video_preset', 'video_crf', 'video_tune', 'video_pix_fmt', 'video_fps_mode',
+                'audio_passthrough_codecs', 'audio_fallback_codec', 'audio_fallback_bitrate'
+            ];
+            
+            fields.forEach(f => {
+                const el = document.getElementById(`field-${f}`);
+                if (!el || config[f] === undefined) return;
+                
+                if (f === 'audio_passthrough_codecs') {
+                    const activeCodecs = config[f].split(',').map(s => s.trim());
+                    el.querySelectorAll('.toggle-btn').forEach(btn => {
+                        const codec = btn.innerText;
+                        btn.classList.toggle('active', activeCodecs.includes(codec));
+                    });
+                } else {
+                    el.value = config[f];
+                }
+            });
+        }
+
+        function toggleCodec(btn, codec) {
+            btn.classList.toggle('active');
+        }
+
+        async function promptCreateDir(parent) {
+            const name = prompt('Category Name:');
+            if (!name) return;
+            const res = await fetch('/api/profiles/create-dir', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ parent, name })
+            });
+            if ((await res.json()).success) loadProfiles();
+        }
+
+        async function promptCreateFile(parent) {
+            const name = prompt('Profile Name:');
+            if (!name) return;
+            const res = await fetch('/api/profiles/create-file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ parent, name })
+            });
+            if ((await res.json()).success) loadProfiles();
+        }
+
+        async function deletePath(path) {
+            if (!confirm(`Are you sure you want to delete ${path}?`)) return;
+            const res = await fetch('/api/profiles/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path })
+            });
+            if ((await res.json()).success) {
+                loadProfiles();
+                document.getElementById('profile-editor').style.display = 'none';
+                document.getElementById('profile-details-empty').style.display = 'flex';
+            }
+        }
+
+        function handleProfileDragStart(e, path) {
+            e.dataTransfer.setData('text/plain', path);
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleProfileDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.classList.add('drag-target');
+        }
+
+        function handleProfileDragLeave(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.classList.remove('drag-target');
+        }
+
+        async function handleProfileDrop(e, dest) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.classList.remove('drag-target');
+            
+            const src = e.dataTransfer.getData('text/plain');
+            if (!src || src === dest) return;
+
+            const res = await fetch('/api/profiles/move', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ src, dest })
+            });
+            
+            if ((await res.json()).success) {
+                loadProfiles();
+            }
+        }
+
+        async function saveProfile() {
+            const path = document.querySelector('.tree-item.file.active')?.getAttribute('data-path');
+            if (!path) return;
+
+            const config = {};
+            const fields = [
+                'output_suffix', 'output_container', 
+                'video_codec', 'video_preset', 'video_crf', 'video_tune', 'video_pix_fmt', 'video_fps_mode',
+                'audio_fallback_codec', 'audio_fallback_bitrate'
+            ];
+
+            fields.forEach(f => {
+                const el = document.getElementById(`field-${f}`);
+                if (el) config[f] = el.value;
+            });
+
+            // Handle audio passthrough toggles
+            const activeCodecs = [];
+            document.querySelectorAll('#field-audio_passthrough_codecs .toggle-btn.active').forEach(btn => {
+                activeCodecs.push(btn.innerText);
+            });
+            config['audio_passthrough_codecs'] = activeCodecs.join(',');
+
+            const res = await fetch('/api/profiles/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path, config })
+            });
+
+            const result = await res.json();
+            if (result.success) {
+                const btn = document.querySelector('#profile-editor .btn');
+                const originalText = btn.innerText;
+                btn.innerText = 'Saved!';
+                btn.style.background = '#10b981';
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.style.background = '';
+                }, 2000);
+            } else {
+                alert('Error saving profile: ' + result.error);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); renderTable(); });
     </script>
 </body>
