@@ -118,6 +118,8 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 .input:focus { border-color: var(--accent); }
 .btn { background: var(--accent); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 4px; cursor: pointer; font-weight: 600; transition: 0.2s; }
 .btn:hover { opacity: 0.9; }
+.btn-danger { background: #ef4444; }
+.btn-danger:hover { background: #dc2626; }
 .list-item { background: var(--card); padding: 1rem; border-radius: 6px; border: 1px solid var(--border); margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
 
 /* Create Job Split View */

@@ -105,3 +105,26 @@ class ConfigLoader:
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
         os.rename(src_path, dest_path)
         return True
+
+    def get_settings(self):
+        if not os.path.exists(self.settings_path):
+            return {}
+        settings = {}
+        with open(self.settings_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                parts = line.split('=', 1)
+                key = parts[0].strip()
+                val = parts[1].strip().strip('"')
+                settings[key] = val
+        return settings
+
+    def save_settings(self, settings):
+        lines = []
+        for k, v in settings.items():
+            lines.append(f'{k} = "{v}"')
+        with open(self.settings_path, 'w') as f:
+            f.write('\n'.join(lines))
+        return True

@@ -40,7 +40,7 @@
                                     <label>Selected Path</label>
                                     <input class="input" placeholder="No file selected" id="selected-path" readonly>
                                 </div>
-                                <button class="btn" style="width: 100%; margin-top: auto;" id="add-job-btn" disabled>Add to Queue</button>
+                                <button class="btn btn-primary" style="width: 100%; margin-top: auto;" id="add-job-btn" disabled onclick="addToQueue()">Add to Queue</button>
                             </div>
                         </div>
 
@@ -152,15 +152,21 @@
                 </div>
 
                 <div id="jobs" class="tab-content">
-                    <div class="table-controls" style="padding: 1.5rem 1rem 1rem 1rem;">
-                        <span style="font-size: 0.8rem; color: var(--dim); font-weight: 600; text-transform: uppercase;">status filter:</span>
-                        <div class="filter-group">
-                            <label class="filter-item"><input type="checkbox" value="pending" checked onchange="renderTable()"> pending</label>
-                            <label class="filter-item"><input type="checkbox" value="running" checked onchange="renderTable()"> running</label>
-                            <label class="filter-item"><input type="checkbox" value="completed" checked onchange="renderTable()"> completed</label>
-                            <label class="filter-item"><input type="checkbox" value="failed" checked onchange="renderTable()"> failed</label>
-                            <label class="filter-item"><input type="checkbox" value="cancelled" checked onchange="renderTable()"> cancelled</label>
+                    <div class="table-controls" style="padding: 1.5rem 1rem 1rem 1rem; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <span style="font-size: 0.8rem; color: var(--dim); font-weight: 600; text-transform: uppercase;">status filter:</span>
+                            <div class="filter-group">
+                                <label class="filter-item"><input type="checkbox" value="pending" checked onchange="renderTable()"> pending</label>
+                                <label class="filter-item"><input type="checkbox" value="running" checked onchange="renderTable()"> running</label>
+                                <label class="filter-item"><input type="checkbox" value="completed" checked onchange="renderTable()"> completed</label>
+                                <label class="filter-item"><input type="checkbox" value="failed" checked onchange="renderTable()"> failed</label>
+                                <label class="filter-item"><input type="checkbox" value="cancelled" checked onchange="renderTable()"> cancelled</label>
+                            </div>
                         </div>
+                        <button class="btn btn-danger" onclick="clearQueue()" style="font-size: 0.75rem; padding: 0.4rem 0.8rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                            Clear Queue
+                        </button>
                     </div>
                     <div class="table-wrapper">
                         <table id="jobs-table">
@@ -300,15 +306,25 @@
                 </div>
 
                 <div id="settings" class="tab-content" style="padding: 2rem;">
-                    <div class="form-group"><label>Output Directory</label><input class="input" value="/Users/e/Videos/ebrake_output"></div>
+                    <div class="form-group">
+                        <label>Output Directory</label>
+                        <input class="input" id="setting-output_dir" placeholder="e.g. /media/transcoded" value="">
+                        <div style="font-size: 0.75rem; color: var(--dim); margin-top: 0.5rem;">
+                            Leave empty to save transcoded files in the same directory as the source.
+                        </div>
+                    </div>
+                    <button class="btn" onclick="saveSettings()" id="save-settings-btn">Save Settings</button>
                 </div>
             </div>
 
             <footer class="footer">
-                <div class="footer-filename">The_Last_of_Us_S01E03.mkv</div>
-                <div class="footer-percentage">42.8%</div>
-                <div class="footer-progress"><div class="footer-progress-bar" style="width: 42.8%;"></div></div>
-                <div class="footer-stats"><div>ETA:<span>00:41:43</span></div><div>Pos:<span>00:03:24</span></div><div>Elapsed:<span>00:15:03</span></div></div>
+                <div class="footer-filename" id="footer-filename">---</div>
+                <div class="footer-percentage" id="footer-percentage">0%</div>
+                <div class="footer-progress"><div class="footer-progress-bar" id="footer-progress-bar" style="width: 0%;"></div></div>
+                <div class="footer-stats">
+                    <div>ETA:<span id="footer-eta">--:--:--</span></div>
+                    <div>Elapsed:<span id="footer-elapsed">--:--:--</span></div>
+                </div>
             </footer>
         </main>
     </div>
@@ -332,11 +348,63 @@
             { id: 'error', label: 'Error', visible: false, width: 300 }
         ];
 
-        let jobsData = [
-            { id: 1, filename: 'Succession.S04E10.mkv', status: 'pending', created_at: '2026-05-08 10:00', input_path: '/media/Succession.S04E10.mkv', preset: 'Standard 1080p' },
-            { id: 2, filename: 'Barry.S04E08.mkv', status: 'completed', duration: '00:45:12', savings: '34%', created_at: '2026-05-08 09:00', input_path: '/media/Barry.S04E08.mkv', preset: 'Fast 720p' },
-            { id: 3, filename: 'The_Last_of_Us_S01E03.mkv', status: 'running', created_at: '2026-05-08 11:00', input_path: '/media/The_Last_of_Us_S01E03.mkv', preset: 'Standard 1080p' }
-        ];
+        let jobsData = [];
+
+        async function fetchJobs() {
+            try {
+                const res = await fetch('/api/jobs');
+                jobsData = await res.json();
+                renderTable();
+                updateFooter();
+            } catch (e) { console.error("Failed to fetch jobs:", e); }
+        }
+
+        function updateFooter() {
+            const runningJob = jobsData.find(j => j.status === 'running');
+            const fileName = document.getElementById('footer-filename');
+            const percentage = document.getElementById('footer-percentage');
+            const progressBar = document.getElementById('footer-progress-bar');
+            const eta = document.getElementById('footer-eta');
+            const elapsed = document.getElementById('footer-elapsed');
+
+            if (runningJob) {
+                fileName.innerText = runningJob.input_path.split('/').pop();
+                percentage.innerText = Math.round(runningJob.progress) + '%';
+                progressBar.style.width = runningJob.progress + '%';
+                
+                // Calculate elapsed
+                const start = new Date(runningJob.started_at + "Z"); // Add Z for UTC
+                const now = new Date();
+                const diffSec = Math.floor((now - start) / 1000);
+                elapsed.innerText = formatTime(diffSec);
+
+                // Simple ETA based on progress
+                if (runningJob.progress > 0) {
+                    const totalSec = (diffSec / runningJob.progress) * 100;
+                    const remainingSec = Math.max(0, totalSec - diffSec);
+                    eta.innerText = formatTime(remainingSec);
+                } else {
+                    eta.innerText = '--:--:--';
+                }
+            } else {
+                fileName.innerText = '---';
+                percentage.innerText = '0%';
+                progressBar.style.width = '0%';
+                eta.innerText = '--:--:--';
+                elapsed.innerText = '--:--:--';
+            }
+        }
+
+        function formatTime(sec) {
+            if (isNaN(sec) || sec < 0) return '--:--:--';
+            const h = Math.floor(sec / 3600).toString().padStart(2, '0');
+            const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0');
+            const s = Math.floor(sec % 60).toString().padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        }
+
+        // Auto-refresh jobs
+        setInterval(fetchJobs, 2000);
 
         const tabMap = {
             'create': '/create',
@@ -365,6 +433,7 @@
 
             if (id === 'jobs') renderTable();
             if (id === 'profiles') loadProfiles();
+            if (id === 'settings') loadSettings();
 
             // Update URL
             if (pushState && tabMap[id]) {
@@ -507,7 +576,9 @@
             document.querySelectorAll('.browser-item').forEach(el => el.classList.remove('selected'));
             event.currentTarget.classList.add('selected');
             document.getElementById('selected-path').value = '/media/' + path;
-            document.getElementById('add-job-btn').disabled = false;
+            const btn = document.getElementById('add-job-btn');
+            btn.disabled = false;
+            btn.classList.add('btn-primary');
         }
 
         let sortCol = null; // Default to position sorting
@@ -556,15 +627,10 @@
             header.innerHTML = visibleCols.map((col, index) => {
                 const isSorted = sortCol === col.id;
                 const icon = isSorted ? (sortDir === 'asc' ? '<i data-lucide="chevron-up" style="width:12px; height:12px;"></i>' : '<i data-lucide="chevron-down" style="width:12px; height:12px;"></i>') : '';
-                
                 return `
                 <th style="position: relative;"
-                    draggable="true" 
-                    ondragstart="handleDragStart(event, ${index})" 
-                    ondragover="handleDragOver(event)" 
-                    ondrop="handleDrop(event, ${index})"
-                    oncontextmenu="showHeaderMenu(event)"
-                    onclick="toggleSort('${col.id}')">
+                    draggable="true" ondragstart="handleDragStart(event, ${index})" ondragover="handleDragOver(event)" ondrop="handleDrop(event, ${index})"
+                    oncontextmenu="showHeaderMenu(event)" onclick="toggleSort('${col.id}')">
                     <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden; text-overflow: ellipsis;">
                         <span>${col.label}</span>
                         ${icon}
@@ -574,12 +640,11 @@
                 `;
             }).join('');
 
-            const selectedStatuses = Array.from(document.querySelectorAll('.filter-item input:checked')).map(cb => cb.value);
+            const selectedStatuses = Array.from(document.querySelectorAll('.filter-group input:checked')).map(cb => cb.value);
             
-            // Primary compare function
             const compare = (a, b, col, dir) => {
-                let valA = a[col];
-                let valB = b[col];
+                let valA = a[col] || '';
+                let valB = b[col] || '';
                 if (col === 'status') {
                     valA = statusRank[a.status];
                     valB = statusRank[b.status];
@@ -589,7 +654,6 @@
                 return 0;
             };
 
-            // Secondary / Default sort: Created At (DESC) - newest first
             const defaultCompare = (a, b) => {
                 if (a.created_at > b.created_at) return -1;
                 if (a.created_at < b.created_at) return 1;
@@ -606,14 +670,55 @@
                 });
 
             body.innerHTML = filteredData.map((job, idx) => `
-                <tr data-job-id="${job.id || ''}">
+                <tr data-job-id="${job.id}">
                     ${visibleCols.map(col => {
                         if (col.id === 'pos') return `<td>${idx + 1}</td>`;
+                        if (col.id === 'status') return `<td><div class="status-pill status-${job.status}">${job.status}</div></td>`;
+                        if (col.id === 'filename') {
+                            const fname = job.input_path.split('/').pop();
+                            return `
+                                <td>
+                                    <div style="font-weight: 600; color: white; margin-bottom: 0.25rem;">${fname}</div>
+                                    <div class="progress-container">
+                                        <div class="progress-bar" style="width: ${job.progress}%"></div>
+                                    </div>
+                                </td>
+                            `;
+                        }
+                        if (col.id === 'savings') return `<td>${job.savings}</td>`;
                         return `<td>${job[col.id] || '-'}</td>`;
                     }).join('')}
                 </tr>
             `).join('');
             lucide.createIcons();
+        }
+
+        async function addToQueue() {
+            const input_path = document.getElementById('selected-path').value;
+            const profile_path = document.getElementById('job-preset').value;
+            
+            if (!input_path || input_path === 'No file selected') {
+                alert('Please select a file first');
+                return;
+            }
+
+            const res = await fetch('/api/jobs/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ input_path, profile_path })
+            });
+            
+            if ((await res.json()).success) {
+                fetchJobs();
+            }
+        }
+
+        async function clearQueue() {
+            if (!confirm('Are you sure you want to clear the entire queue? This will remove all jobs.')) return;
+            const res = await fetch('/api/jobs/clear', { method: 'POST' });
+            if ((await res.json()).success) {
+                fetchJobs();
+            }
         }
 
 
@@ -912,6 +1017,34 @@
                 }, 2000);
             } else {
                 alert('Error saving profile: ' + result.error);
+            }
+        }
+
+        async function loadSettings() {
+            const res = await fetch('/api/settings');
+            const data = await res.json();
+            if (data.output_dir !== undefined) {
+                document.getElementById('setting-output_dir').value = data.output_dir;
+            }
+        }
+
+        async function saveSettings() {
+            const output_dir = document.getElementById('setting-output_dir').value;
+            const res = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ output_dir })
+            });
+            const result = await res.json();
+            if (result.success) {
+                const btn = document.getElementById('save-settings-btn');
+                const oldText = btn.innerText;
+                btn.innerText = 'Settings Saved!';
+                btn.style.background = '#10b981';
+                setTimeout(() => {
+                    btn.innerText = oldText;
+                    btn.style.background = '';
+                }, 2000);
             }
         }
 
