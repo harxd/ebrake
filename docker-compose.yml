@@ -1,0 +1,17 @@
+services:
+  ebrake:
+    build: .
+    container_name: ebrake
+    ports:
+      - "5000:5000"
+    volumes:
+      # PERSISTENT DATA: Keep your database, profiles, and settings safe
+      - ${HOME}/Downloads/ebrake/appdata:/app/appdata
+      
+      # MEDIA ACCESS: This is where your movies/videos are located.
+      # You can use ${HOME} to automatically point to your user's home directory.
+      - ${HOME}/Downloads/ebrake/media:/media:rw
+      
+    restart: unless-stopped
+    environment:
+      - TZ=UTC

@@ -3,8 +3,8 @@ suffix = ""
 container = "mkv"
 
 [video]
-codec = "libx264"
-preset = ""
+codec = "libsvtav1"
+preset = "13"
 crf = "23"
 tune = "0"
 pix_fmt = "yuv420p10le"

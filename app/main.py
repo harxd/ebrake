@@ -179,8 +179,12 @@ def list_jobs():
 
 @app.route('/api/jobs/clear', methods=['POST'])
 def clear_jobs():
+    status = request.json.get('status') if request.is_json else None
     db = get_db()
-    db.execute("DELETE FROM jobs")
+    if status:
+        db.execute("DELETE FROM jobs WHERE status = ?", (status,))
+    else:
+        db.execute("DELETE FROM jobs")
     db.commit()
     db.close()
     return jsonify({'success': True})

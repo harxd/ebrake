@@ -27,7 +27,6 @@
                 <div id="create" class="tab-content active">
                     <div class="split-view">
                         <div class="split-left">
-                            <div class="section-title">Source File</div>
                             <div class="file-picker-container">
                                 <div class="browser-breadcrumbs" id="breadcrumbs">
                                     <span class="breadcrumb-item">/media</span>
@@ -45,7 +44,6 @@
                         </div>
 
                         <div class="split-right">
-                            <div class="section-title">Preset Overrides</div>
                             <div class="scroll-area">
                                 <div class="option-grid" style="margin-bottom: 2rem;">
                                     <div class="form-group">
@@ -81,15 +79,18 @@
                                     <div class="option-grid">
                                         <div class="form-group">
                                             <label>Codec</label>
-                                            <select class="input" id="job-field-video_codec">
+                                            <select class="input" id="job-field-video_codec" onchange="updatePresetSlider('job-field')">
                                                 <option value="libsvtav1">libsvtav1</option>
                                                 <option value="libx264">libx264</option>
                                                 <option value="libx265">libx265</option>
                                             </select>
                                         </div>
                                         <div class="form-group">
-                                            <label>Preset</label>
-                                            <input class="input" id="job-field-video_preset">
+                                            <div class="slider-header">
+                                                <label>Preset</label>
+                                                <span class="slider-value" id="job-field-video_preset-val">6</span>
+                                            </div>
+                                            <input type="range" id="job-field-video_preset" oninput="updateSliderVal(this)">
                                         </div>
                                         <div class="form-group">
                                             <label>CRF / Quality</label>
@@ -152,20 +153,16 @@
                 </div>
 
                 <div id="jobs" class="tab-content">
-                    <div class="table-controls" style="padding: 1.5rem 1rem 1rem 1rem; display: flex; justify-content: space-between; align-items: center;">
-                        <div style="display: flex; align-items: center; gap: 1rem;">
-                            <span style="font-size: 0.8rem; color: var(--dim); font-weight: 600; text-transform: uppercase;">status filter:</span>
-                            <div class="filter-group">
-                                <label class="filter-item"><input type="checkbox" value="pending" checked onchange="renderTable()"> pending</label>
-                                <label class="filter-item"><input type="checkbox" value="running" checked onchange="renderTable()"> running</label>
-                                <label class="filter-item"><input type="checkbox" value="completed" checked onchange="renderTable()"> completed</label>
-                                <label class="filter-item"><input type="checkbox" value="failed" checked onchange="renderTable()"> failed</label>
-                                <label class="filter-item"><input type="checkbox" value="cancelled" checked onchange="renderTable()"> cancelled</label>
-                            </div>
+                    <div class="sub-nav">
+                        <div style="display: flex; gap: 0.25rem;">
+                            <button class="sub-nav-btn active" onclick="setJobSubTab('pending')">Pending <span class="tab-count" id="count-pending">0</span></button>
+                            <button class="sub-nav-btn" onclick="setJobSubTab('completed')">Completed <span class="tab-count" id="count-completed">0</span></button>
+                            <button class="sub-nav-btn" onclick="setJobSubTab('cancelled')">Cancelled <span class="tab-count" id="count-cancelled">0</span></button>
+                            <button class="sub-nav-btn" onclick="setJobSubTab('failed')">Failed <span class="tab-count" id="count-failed">0</span></button>
                         </div>
-                        <button class="btn btn-danger" onclick="clearQueue()" style="font-size: 0.75rem; padding: 0.4rem 0.8rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <button id="clear-tab-btn" class="btn btn-danger" onclick="clearCurrentTabJobs()" style="font-size: 0.7rem; padding: 0.4rem 0.8rem; display: flex; align-items: center; gap: 0.5rem;">
                             <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
-                            Clear Queue
+                            <span>Clear Pending</span>
                         </button>
                     </div>
                     <div class="table-wrapper">
@@ -221,15 +218,18 @@
                                         <div class="option-grid">
                                             <div class="form-group">
                                                 <label>Codec</label>
-                                                <select class="input" id="field-video_codec">
+                                                <select class="input" id="field-video_codec" onchange="updatePresetSlider('field')">
                                                     <option value="libsvtav1">libsvtav1 (AV1)</option>
                                                     <option value="libx264">libx264 (H264)</option>
                                                     <option value="libx265">libx265 (HEVC)</option>
                                                 </select>
                                             </div>
                                             <div class="form-group">
-                                                <label title="Preset speed. SVT-AV1: 0-13 (0 is slowest). x264/x265: ultrafast to veryslow">Preset</label>
-                                                <input class="input" id="field-video_preset" placeholder="2">
+                                                <div class="slider-header">
+                                                    <label title="Preset speed. Higher is faster, lower is better quality/slower.">Preset</label>
+                                                    <span class="slider-value" id="field-video_preset-val">6</span>
+                                                </div>
+                                                <input type="range" id="field-video_preset" oninput="updateSliderVal(this)">
                                             </div>
                                             <div class="form-group">
                                                 <label title="Constant Rate Factor. Lower = better quality/larger file. Typical: 18-28.">CRF / Quality</label>
@@ -335,7 +335,7 @@
         const allColumns = [
             { id: 'pos', label: '#', visible: true, width: 40 },
             { id: 'filename', label: 'File Name', visible: true, width: 300 },
-            { id: 'status', label: 'status', visible: true, width: 120 },
+            { id: 'status', label: 'status', visible: false, width: 120 },
             { id: 'duration', label: 'Duration', visible: true, width: 100 },
             { id: 'savings', label: 'Savings', visible: true, width: 100 },
             { id: 'created_at', label: 'Created At', visible: false, width: 150 },
@@ -349,11 +349,45 @@
         ];
 
         let jobsData = [];
+        let currentJobSubTab = 'pending';
+
+        function setJobSubTab(status) {
+            currentJobSubTab = status;
+            document.querySelectorAll('.sub-nav-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('onclick').includes(`'${status}'`));
+            });
+            const clearBtn = document.querySelector('#clear-tab-btn span');
+            if (clearBtn) clearBtn.innerText = `Clear ${status.charAt(0).toUpperCase() + status.slice(1)}`;
+            renderTable();
+        }
+
+        async function clearCurrentTabJobs() {
+            if (!confirm(`Are you sure you want to clear all ${currentJobSubTab} jobs?`)) return;
+            const res = await fetch('/api/jobs/clear', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: currentJobSubTab })
+            });
+            if ((await res.json()).success) {
+                fetchJobs();
+            }
+        }
 
         async function fetchJobs() {
             try {
                 const res = await fetch('/api/jobs');
                 jobsData = await res.json();
+                
+                // Update counts
+                const counts = { pending: 0, completed: 0, cancelled: 0, failed: 0 };
+                jobsData.forEach(j => {
+                    if (counts[j.status] !== undefined) counts[j.status]++;
+                });
+                for (const s in counts) {
+                    const el = document.getElementById(`count-${s}`);
+                    if (el) el.innerText = counts[s];
+                }
+
                 renderTable();
                 updateFooter();
             } catch (e) { console.error("Failed to fetch jobs:", e); }
@@ -514,8 +548,11 @@
                         const codec = btn.innerText;
                         btn.classList.toggle('active', activeCodecs.includes(codec));
                     });
+                } else if (f === 'video_preset') {
+                    updatePresetSlider('job-field', config[f]);
                 } else {
                     el.value = config[f];
+                    if (f === 'video_codec') updatePresetSlider('job-field');
                 }
             });
         }
@@ -617,7 +654,11 @@
             const header = document.getElementById('table-header');
             const body = document.getElementById('jobs-body');
             const table = document.getElementById('jobs-table');
-            const visibleCols = allColumns.filter(c => c.visible);
+            const visibleCols = allColumns.filter(c => {
+                if ((c.id === 'duration' || c.id === 'savings') && currentJobSubTab === 'pending') return false;
+                if (c.id === 'created_at' && currentJobSubTab === 'pending') return true;
+                return c.visible;
+            });
 
             cols.innerHTML = visibleCols.map(col => `<col id="col-${col.id}" style="width: ${col.width}px;">`).join('');
             
@@ -640,7 +681,7 @@
                 `;
             }).join('');
 
-            const selectedStatuses = Array.from(document.querySelectorAll('.filter-group input:checked')).map(cb => cb.value);
+            const selectedStatuses = [currentJobSubTab];
             
             const compare = (a, b, col, dir) => {
                 let valA = a[col] || '';
@@ -713,13 +754,6 @@
             }
         }
 
-        async function clearQueue() {
-            if (!confirm('Are you sure you want to clear the entire queue? This will remove all jobs.')) return;
-            const res = await fetch('/api/jobs/clear', { method: 'POST' });
-            if ((await res.json()).success) {
-                fetchJobs();
-            }
-        }
 
 
 
@@ -894,8 +928,11 @@
                         const codec = btn.innerText;
                         btn.classList.toggle('active', activeCodecs.includes(codec));
                     });
+                } else if (f === 'video_preset') {
+                    updatePresetSlider('field', config[f]);
                 } else {
                     el.value = config[f];
+                    if (f === 'video_codec') updatePresetSlider('field');
                 }
             });
         }
@@ -989,7 +1026,10 @@
 
             fields.forEach(f => {
                 const el = document.getElementById(`field-${f}`);
-                if (el) config[f] = el.value;
+                if (el) {
+                    if (f === 'video_preset') config[f] = getPresetValue('field');
+                    else config[f] = el.value;
+                }
             });
 
             // Handle audio passthrough toggles
@@ -1048,7 +1088,54 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); renderTable(); });
+        const x26xPresets = ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'];
+
+        function updatePresetSlider(prefix, initialVal = null) {
+            const codec = document.getElementById(`${prefix}-video_codec`).value;
+            const slider = document.getElementById(`${prefix}-video_preset`);
+            const valLabel = document.getElementById(`${prefix}-video_preset-val`);
+
+            if (codec === 'libsvtav1') {
+                slider.min = 0; slider.max = 13; slider.step = 1;
+                if (initialVal === null) slider.value = 6;
+                else slider.value = initialVal;
+            } else {
+                slider.min = 0; slider.max = x26xPresets.length - 1; slider.step = 1;
+                if (initialVal === null) {
+                    slider.value = x26xPresets.indexOf('medium');
+                } else {
+                    const idx = x26xPresets.indexOf(initialVal);
+                    slider.value = idx !== -1 ? idx : x26xPresets.indexOf('medium');
+                }
+            }
+            updateSliderVal(slider);
+        }
+
+        function updateSliderVal(el) {
+            const valLabel = document.getElementById(`${el.id}-val`);
+            const prefix = el.id.includes('job-field') ? 'job-field' : 'field';
+            const codec = document.getElementById(`${prefix}-video_codec`).value;
+
+            if (codec === 'libsvtav1') {
+                valLabel.innerText = el.value;
+            } else {
+                valLabel.innerText = x26xPresets[el.value];
+            }
+        }
+
+        function getPresetValue(prefix) {
+            const codec = document.getElementById(`${prefix}-video_codec`).value;
+            const slider = document.getElementById(`${prefix}-video_preset`);
+            if (codec === 'libsvtav1') return slider.value;
+            return x26xPresets[slider.value];
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { 
+            lucide.createIcons(); 
+            renderTable(); 
+            updatePresetSlider('job-field');
+            updatePresetSlider('field');
+        });
     </script>
 </body>
 </html>
