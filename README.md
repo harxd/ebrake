@@ -15,7 +15,7 @@ Simple ffmpeg-based transcoding web app.
 ```yaml
 services:
   ebrake:
-    image: harxd/ebrake:latest
+    image: minutelight/ebrake:latest
     container_name: ebrake
     ports:
       - "5000:5000"
