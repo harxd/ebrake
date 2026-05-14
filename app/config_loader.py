@@ -10,6 +10,35 @@ class ConfigLoader:
         
         # Ensure directories exist
         os.makedirs(self.profiles_dir, exist_ok=True)
+        
+        self._initialize_defaults()
+
+    def _initialize_defaults(self):
+        if os.path.exists(self.settings_path):
+            return
+
+        defaults_src = os.path.join(os.path.dirname(__file__), "defaults", "profiles")
+        if os.path.exists(defaults_src):
+            print(f"First run detected (ebrake.toml missing). Copying default profiles...")
+            try:
+                # Copy tree while merging (dirs exist)
+                for root, dirs, files in os.walk(defaults_src):
+                    rel_path = os.path.relpath(root, defaults_src)
+                    dest_dir = os.path.join(self.profiles_dir, rel_path)
+                    os.makedirs(dest_dir, exist_ok=True)
+                    
+                    for file in files:
+                        shutil.copy2(os.path.join(root, file), os.path.join(dest_dir, file))
+                
+                # Create initial settings file
+                self.save_settings({
+                    "media_dir": "/media",
+                    "output_dir": "/media/ebrake-output"
+                })
+            except Exception as e:
+                print(f"Failed to initialize defaults: {e}")
+
+
 
     def _get_abs_path(self, rel_path):
         target = os.path.abspath(os.path.join(self.profiles_dir, rel_path))

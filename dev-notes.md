@@ -1,3 +1,9 @@
+# Docker Hub Workflow
+```bash
+# Build and push multi-arch (AMD64 + ARM64)
+docker buildx build --platform linux/amd64,linux/arm64 -t minutelight/ebrake:latest --push .
+```
+
 # SQLite schema
 Jobs
 

@@ -1,1 +1,2 @@
-output_dir = ""
+media_dir = "/media"
+output_dir = "/media/ebrake-output"
