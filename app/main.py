@@ -40,7 +40,12 @@ def init_db():
     """)
     conn.close()
 
-init_db()
+try:
+    init_db()
+except Exception as e:
+    print(f"CRITICAL: Failed to initialize database in appdata/. Check permissions! Error: {e}")
+    # Don't exit here, let gunicorn logs capture it, but it will likely crash anyway
+
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)

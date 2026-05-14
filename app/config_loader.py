@@ -9,9 +9,18 @@ class ConfigLoader:
         self.settings_path = os.path.join(self.base_dir, "ebrake.toml")
         
         # Ensure directories exist
-        os.makedirs(self.profiles_dir, exist_ok=True)
+        try:
+            os.makedirs(self.profiles_dir, exist_ok=True)
+            # Test writability
+            test_file = os.path.join(self.base_dir, ".write_test")
+            with open(test_file, 'w') as f:
+                f.write('test')
+            os.remove(test_file)
+        except Exception as e:
+            print(f"CRITICAL: Cannot write to {self.base_dir}. Check volume permissions! Error: {e}")
         
         self._initialize_defaults()
+
 
     def _initialize_defaults(self):
         if os.path.exists(self.settings_path):

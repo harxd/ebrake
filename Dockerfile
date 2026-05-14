@@ -32,3 +32,5 @@ ENV PYTHONUNBUFFERED=1
 # Command to run the application
 # Using gunicorn for better performance and stability
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "4", "app.main:app"]
+
+
