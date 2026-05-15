@@ -59,3 +59,7 @@ Run `systemctl --user daemon-reload && systemctl --user start ebrake` to deploy.
 1. Create a virtual environment: `python -m venv .venv`
 2. Install dependencies: `.venv/Scripts/pip install -r requirements.txt gunicorn`
 3. Run the app: `$env:PYTHONPATH="app"; .venv/Scripts/python.exe app/main.py`
+
+### Future features
+
+- VMAF
