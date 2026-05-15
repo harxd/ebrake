@@ -40,18 +40,33 @@ class ConfigLoader:
                         shutil.copy2(os.path.join(root, file), os.path.join(dest_dir, file))
                 
                 # Create initial settings file
-                self.save_settings({
-                    "media_dir": "/media",
-                    "output_dir": "/media/ebrake-output"
-                })
+                settings_src = os.path.join(os.path.dirname(__file__), "defaults", "ebrake.toml")
+                if os.path.exists(settings_src):
+                    shutil.copy2(settings_src, self.settings_path)
+                else:
+                    self.save_settings({
+                        "media_dir": "/media",
+                        "output_dir": "/media/ebrake-output"
+                    })
             except Exception as e:
                 print(f"Failed to initialize defaults: {e}")
 
 
 
     def _get_abs_path(self, rel_path):
+        # Normalize slashes for the incoming path
+        rel_path = rel_path.replace('/', os.sep).replace('\\', os.sep)
+        # Remove leading slash if present to prevent os.path.join from treating it as absolute
+        if rel_path.startswith(os.sep):
+            rel_path = rel_path[1:]
+            
         target = os.path.abspath(os.path.join(self.profiles_dir, rel_path))
-        if not os.path.commonpath([self.profiles_dir, target]) == self.profiles_dir:
+        
+        # Security check: ensure the target is within the profiles directory
+        norm_base = os.path.normcase(os.path.abspath(self.profiles_dir))
+        norm_target = os.path.normcase(target)
+        
+        if not os.path.commonpath([norm_base, norm_target]) == norm_base:
             raise PermissionError("Access denied")
         return target
 
@@ -70,7 +85,7 @@ class ConfigLoader:
                     tree.append({
                         'name': name,
                         'type': 'file',
-                        'path': os.path.relpath(full_path, self.profiles_dir)
+                        'path': os.path.relpath(full_path, self.profiles_dir).replace('\\', '/')
                     })
             return tree
         return walk(self.profiles_dir)

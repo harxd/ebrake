@@ -1,0 +1,103 @@
+<div class="option-group">
+    <div class="option-group-title"><i data-lucide="package"></i> Output Formatting</div>
+    <div class="option-grid">
+        <div class="form-group">
+            <label title="Appended to the original filename (e.g. video [RF23-2].mkv). Leave empty to auto-append a number if conflict exists.">Output Suffix</label>
+            <input class="input" id="{{ prefix }}output_suffix" placeholder='e.g. [AV1-10bit]'>
+        </div>
+        <div class="form-group">
+            <label>Container</label>
+            <select class="input" id="{{ prefix }}output_container">
+                <option value="mkv">mkv</option>
+                <option value="mp4">mp4</option>
+                <option value="webm">webm</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="option-group">
+    <div class="option-group-title"><i data-lucide="video"></i> Video Encoding</div>
+    <div class="option-grid">
+        <div class="form-group">
+            <label>Codec</label>
+            <select class="input" id="{{ prefix }}video_codec" onchange="updatePresetSlider('{{ prefix[:-1] if prefix.endswith('-') else prefix }}')">
+                <option value="libsvtav1">libsvtav1 (AV1)</option>
+                <option value="libx264">libx264 (H264)</option>
+                <option value="libx265">libx265 (HEVC)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <div class="slider-header">
+                <label title="Preset speed. Higher is faster, lower is better quality/slower.">Preset</label>
+                <span class="slider-value" id="{{ prefix }}video_preset-val">6</span>
+            </div>
+            <input type="range" id="{{ prefix }}video_preset" oninput="updateSliderVal(this)">
+        </div>
+        <div class="form-group">
+            <label title="Constant Rate Factor. Lower = better quality/larger file. Typical: 18-28.">CRF / Quality</label>
+            <input type="number" class="input" id="{{ prefix }}video_crf" value="23">
+        </div>
+        <div class="form-group">
+            <label title="SVT-AV1 options: 0 (Visual), 1 (PSNR), 2 (SSIM), 3 (Subjective)">Visual Tune</label>
+            <select class="input" id="{{ prefix }}video_tune">
+                <option value="0">0 (Visual Quality)</option>
+                <option value="1">1 (PSNR)</option>
+                <option value="2">2 (SSIM)</option>
+                <option value="3">3 (Subjective)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Pixel Format</label>
+            <select class="input" id="{{ prefix }}video_pix_fmt">
+                <option value="yuv420p10le">yuv420p10le (10-bit)</option>
+                <option value="yuv420p">yuv420p (8-bit)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>FPS Mode</label>
+            <select class="input" id="{{ prefix }}video_fps_mode">
+                <option value="cfr">cfr (Constant)</option>
+                <option value="vfr">vfr (Variable)</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="option-group">
+    <div class="option-group-title"><i data-lucide="volume-2"></i> Audio Encoding</div>
+    <div class="form-group">
+        <label title="Select audio codecs to copy directly without re-encoding">Passthrough Codecs</label>
+        <div class="toggle-group" id="{{ prefix }}audio_passthrough_codecs">
+            <button class="toggle-btn" onclick="toggleCodec(this, 'aac')">aac</button>
+            <button class="toggle-btn" onclick="toggleCodec(this, 'ac3')">ac3</button>
+            <button class="toggle-btn" onclick="toggleCodec(this, 'eac3')">eac3</button>
+            <button class="toggle-btn" onclick="toggleCodec(this, 'dts')">dts</button>
+            <button class="toggle-btn" onclick="toggleCodec(this, 'flac')">flac</button>
+            <button class="toggle-btn" onclick="toggleCodec(this, 'truehd')">truehd</button>
+            <button class="toggle-btn" onclick="toggleCodec(this, 'opus')">opus</button>
+        </div>
+    </div>
+    <div class="option-grid">
+        <div class="form-group">
+            <label>Fallback Codec</label>
+            <select class="input" id="{{ prefix }}audio_fallback_codec">
+                <option value="libopus">libopus</option>
+                <option value="libmp3lame">libmp3lame</option>
+                <option value="ac3">ac3</option>
+                <option value="flac">flac</option>
+                <option value="aac">aac</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Fallback Bitrate</label>
+            <select class="input" id="{{ prefix }}audio_fallback_bitrate">
+                <option value="96k">96k</option>
+                <option value="128k">128k</option>
+                <option value="192k">192k</option>
+                <option value="256k">256k</option>
+                <option value="320k">320k</option>
+            </select>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ebrake{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='hammock.ico') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div style="padding: 1.5rem; font-weight: 700; color: var(--accent);">ebrake</div>
+            <nav class="nav">
+                <button id="nav-create" onclick="tab('create')"><i data-lucide="circle-plus"></i> Create Job</button>
+                <button id="nav-jobs" onclick="tab('jobs')"><i data-lucide="align-justify"></i> Jobs</button>
+                <button id="nav-profiles" onclick="tab('profiles')"><i data-lucide="file-sliders"></i> Profiles</button>
+                <div class="nav-spacer"></div>
+                <button id="nav-settings" onclick="tab('settings')"><i data-lucide="settings"></i> Settings</button>
+            </nav>
+        </aside>
+
+        <main class="main">
+            <div class="content">
+                {% block content %}{% endblock %}
+            </div>
+
+            <footer class="footer">
+                <div class="footer-filename" id="footer-filename">---</div>
+                <div class="footer-percentage" id="footer-percentage">0%</div>
+                <div class="footer-progress"><div class="footer-progress-bar" id="footer-progress-bar" style="width: 0%;"></div></div>
+                <div class="footer-stats">
+                    <div>ETA:<span id="footer-eta">--:--:--</span></div>
+                    <div>Elapsed:<span id="footer-elapsed">--:--:--</span></div>
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <div id="context-menu" class="context-menu"></div>
+
+    <script src="/static/js/shared.js"></script>
+    <script src="/static/js/navigation.js"></script>
+    <script src="/static/js/ui-components.js"></script>
+    <script src="/static/js/files.js"></script>
+    <script src="/static/js/jobs.js"></script>
+    <script src="/static/js/profiles.js"></script>
+    <script src="/static/js/settings.js"></script>
+    <script src="/static/js/main.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

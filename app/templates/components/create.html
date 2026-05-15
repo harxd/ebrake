@@ -1,0 +1,38 @@
+<div id="create" class="tab-content active">
+    <div class="split-view">
+        <div class="split-left">
+            <div class="file-picker-container">
+                <div class="browser-breadcrumbs" id="breadcrumbs">
+                    <span class="breadcrumb-item">/media</span>
+                </div>
+                <div class="file-browser" id="file-browser">
+                    <!-- Items will be injected by JS -->
+                </div>
+                
+                <div class="form-group" style="margin-top: 1.5rem;">
+                    <label>Selected Path</label>
+                    <input class="input" placeholder="No file selected" id="selected-path" readonly>
+                </div>
+                <button class="btn btn-primary" style="width: 100%; margin-top: auto;" id="add-job-btn" disabled onclick="addToQueue()">Add to Queue</button>
+            </div>
+        </div>
+
+        <div class="split-right">
+            <div class="scroll-area">
+                <div class="option-grid" style="margin-bottom: 2rem;">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select class="input" id="job-category" onchange="updateJobPresetDropdown()"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Preset</label>
+                        <select class="input" id="job-preset" onchange="loadJobPresetSettings()"></select>
+                    </div>
+                </div>
+
+                {% set prefix = 'job-field-' %}
+                {% include "components/profile_fields.html" %}
+            </div>
+        </div>
+    </div>
+</div>

@@ -4,6 +4,8 @@ import sqlite3
 import threading
 import time
 from datetime import datetime
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 from config_loader import ConfigLoader
 from transcoder import Transcoder
 
@@ -18,7 +20,9 @@ def get_media_base():
         os.makedirs(base, exist_ok=True)
     return base
 
-DB_PATH = "appdata/jobs.db"
+# Ensure absolute paths for database
+APPDATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "appdata")
+DB_PATH = os.path.join(APPDATA_DIR, "jobs.db")
 
 def init_db():
     os.makedirs("appdata", exist_ok=True)
@@ -34,10 +38,23 @@ def init_db():
             error TEXT,
             input_size INTEGER,
             output_size INTEGER,
+            duration TEXT,
+            command TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            started_at TIMESTAMP
+            started_at TIMESTAMP,
+            finished_at TIMESTAMP
         )
     """)
+    # Ensure new columns exist for existing databases
+    try:
+        conn.execute("ALTER TABLE jobs ADD COLUMN duration TEXT")
+    except: pass
+    try:
+        conn.execute("ALTER TABLE jobs ADD COLUMN command TEXT")
+    except: pass
+    try:
+        conn.execute("ALTER TABLE jobs ADD COLUMN finished_at TIMESTAMP")
+    except: pass
     conn.close()
 
 try:
@@ -46,6 +63,23 @@ except Exception as e:
     print(f"CRITICAL: Failed to initialize database in appdata/. Check permissions! Error: {e}")
     # Don't exit here, let gunicorn logs capture it, but it will likely crash anyway
 
+
+# File System Watcher
+media_version = 0
+def increment_media_version():
+    global media_version
+    media_version += 1
+
+class MediaChangeHandler(FileSystemEventHandler):
+    def on_any_event(self, event):
+        increment_media_version()
+
+observer = Observer()
+try:
+    observer.schedule(MediaChangeHandler(), get_media_base(), recursive=True)
+    observer.start()
+except Exception as e:
+    print(f"Watcher failed to start: {e}")
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -104,31 +138,35 @@ def worker():
             elif rel_input.startswith('/media'): rel_input = rel_input[6:]
             real_input_path = os.path.join(base_media, rel_input)
             
-            # Record input size
+            # Record metadata and command
             input_size = os.path.getsize(real_input_path)
-            wdb = get_db()
-            wdb.execute("UPDATE jobs SET input_size = ? WHERE id = ?", (input_size, job_id))
-            wdb.commit()
-            wdb.close()
-
+            
             # Ensure output directory exists
             os.makedirs(os.path.dirname(job['output_path']), exist_ok=True)
 
             cmd = transcoder.build_command(real_input_path, job['output_path'], profile_cfg)
+            cmd_str = " ".join(cmd)
+
+            wdb = get_db()
+            wdb.execute("UPDATE jobs SET input_size = ?, command = ? WHERE id = ?", 
+                       (input_size, cmd_str, job_id))
+            wdb.commit()
+            wdb.close()
+
             success, error_log = transcoder.run(cmd, update_progress)
 
             fdb = get_db()
             if success:
                 output_size = os.path.getsize(job['output_path'])
-                fdb.execute("UPDATE jobs SET status = 'completed', progress = 100, output_size = ? WHERE id = ?", (output_size, job_id))
+                fdb.execute("UPDATE jobs SET status = 'completed', progress = 100, output_size = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?", (output_size, job_id))
             else:
-                fdb.execute("UPDATE jobs SET status = 'failed', error = ? WHERE id = ?", (error_log, job_id))
+                fdb.execute("UPDATE jobs SET status = 'failed', error = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?", (error_log, job_id))
             fdb.commit()
             fdb.close()
 
         except Exception as e:
             fdb = get_db()
-            fdb.execute("UPDATE jobs SET status = 'failed', error = ? WHERE id = ?", (str(e), job_id))
+            fdb.execute("UPDATE jobs SET status = 'failed', error = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?", (str(e), job_id))
             fdb.commit()
             fdb.close()
 
@@ -187,9 +225,9 @@ def clear_jobs():
     status = request.json.get('status') if request.is_json else None
     db = get_db()
     if status:
-        db.execute("DELETE FROM jobs WHERE status = ?", (status,))
+        db.execute("UPDATE jobs SET status = 'cancelled', finished_at = CURRENT_TIMESTAMP WHERE status = ?", (status,))
     else:
-        db.execute("DELETE FROM jobs")
+        db.execute("UPDATE jobs SET status = 'cancelled', finished_at = CURRENT_TIMESTAMP")
     db.commit()
     db.close()
     return jsonify({'success': True})
@@ -283,6 +321,10 @@ def handle_settings():
         config_mgr.save_settings(request.json)
         return jsonify({'success': True})
     return jsonify(config_mgr.get_settings())
+
+@app.route('/api/files/version')
+def get_media_version():
+    return jsonify({'version': media_version})
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

@@ -1,0 +1,26 @@
+<div id="profiles" class="tab-content">
+    <div class="split-view">
+        <div class="split-left" style="width: 300px; flex: none;">
+            <div class="section-title">Profile Categories</div>
+            <div class="scroll-area" id="profile-tree" oncontextmenu="showContextMenu(event, [{ label: 'Add Category', icon: 'folder-plus', onclick: 'promptCreateDir(\'\')' }])">
+                <!-- Tree will be injected here -->
+            </div>
+        </div>
+        <div class="split-right">
+            <div id="profile-details-empty" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--dim);">
+                <i data-lucide="file-sliders" style="width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.2;"></i>
+                <p>Select a profile to edit</p>
+            </div>
+            <div id="profile-editor" style="display: none; flex: 1; flex-direction: column; height: 100%; overflow: hidden;">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.1);">
+                    <div class="section-title" id="profile-title" style="padding: 0; margin: 0;">Profile Settings</div>
+                    <button class="btn" onclick="saveProfile()">Save Changes</button>
+                </div>
+                <div class="scroll-area">
+                    {% set prefix = 'field-' %}
+                    {% include "components/profile_fields.html" %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

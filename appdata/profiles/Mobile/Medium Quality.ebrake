@@ -3,14 +3,14 @@ suffix = ""
 container = "mkv"
 
 [video]
-codec = "libx265"
-preset = ""
-crf = "23"
+codec = "libx264"
+preset = "medium"
+crf = "25"
 tune = "0"
 pix_fmt = "yuv420p10le"
 fps_mode = "cfr"
 
 [audio]
 fallback_codec = "libopus"
-fallback_bitrate = "256k"
-passthrough_codecs = ""
+fallback_bitrate = "96k"
+passthrough_codecs = "aac,ac3,eac3,opus"

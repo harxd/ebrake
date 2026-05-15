@@ -1,0 +1,21 @@
+<div id="jobs" class="tab-content">
+    <div class="sub-nav">
+        <div style="display: flex; gap: 0.25rem;">
+            <button class="sub-nav-btn active" onclick="setJobSubTab('pending')">Pending <span class="tab-count" id="count-pending">0</span></button>
+            <button class="sub-nav-btn" onclick="setJobSubTab('completed')">Completed <span class="tab-count" id="count-completed">0</span></button>
+            <button class="sub-nav-btn" onclick="setJobSubTab('cancelled')">Cancelled <span class="tab-count" id="count-cancelled">0</span></button>
+            <button class="sub-nav-btn" onclick="setJobSubTab('failed')">Failed <span class="tab-count" id="count-failed">0</span></button>
+        </div>
+        <button id="clear-tab-btn" class="btn btn-danger" onclick="clearCurrentTabJobs()" style="font-size: 0.7rem; padding: 0.4rem 0.8rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+            <span>Clear Pending</span>
+        </button>
+    </div>
+    <div class="table-wrapper">
+        <table id="jobs-table">
+            <colgroup id="table-cols"></colgroup>
+            <thead><tr id="table-header"></tr></thead>
+            <tbody id="jobs-body"></tbody>
+        </table>
+    </div>
+</div>
