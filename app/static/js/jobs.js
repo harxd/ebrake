@@ -209,10 +209,32 @@ async function addToQueue() {
         return;
     }
 
+    // Collect current UI configuration
+    const config = {};
+    const fields = [
+        'output_suffix', 'output_container', 
+        'video_codec', 'video_preset', 'video_crf', 'video_tune', 'video_pix_fmt', 'video_fps_mode',
+        'audio_fallback_codec', 'audio_fallback_bitrate'
+    ];
+
+    fields.forEach(f => {
+        const el = document.getElementById(`job-field-${f}`);
+        if (el) {
+            if (f === 'video_preset') config[f] = getPresetValue('job-field');
+            else config[f] = el.value;
+        }
+    });
+
+    const activeCodecs = [];
+    document.querySelectorAll('#job-field-audio_passthrough_codecs .toggle-btn.active').forEach(btn => {
+        activeCodecs.push(btn.innerText);
+    });
+    config['audio_passthrough_codecs'] = activeCodecs.join(',');
+
     const res = await fetch('/api/jobs/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input_path, profile_path })
+        body: JSON.stringify({ input_path, profile_path, config })
     });
     
     if ((await res.json()).success) {

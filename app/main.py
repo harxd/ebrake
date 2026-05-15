@@ -40,6 +40,7 @@ def init_db():
             output_size INTEGER,
             duration TEXT,
             command TEXT,
+            config TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             started_at TIMESTAMP,
             finished_at TIMESTAMP
@@ -54,6 +55,9 @@ def init_db():
     except: pass
     try:
         conn.execute("ALTER TABLE jobs ADD COLUMN finished_at TIMESTAMP")
+    except: pass
+    try:
+        conn.execute("ALTER TABLE jobs ADD COLUMN config TEXT")
     except: pass
     conn.close()
 
@@ -102,26 +106,36 @@ def worker():
         db.close()
 
         try:
-            # Load profile for settings
-            # We need to read the profile file
-            profile_content = config_mgr.read_profile(job['profile_name'])
-            if not profile_content:
-                raise Exception(f"Profile {job['profile_name']} not found")
-            
-            # Simple TOML parser in Python for the worker
+            # Load configuration
+            import json
             profile_cfg = {}
-            current_section = ""
-            for line in profile_content.split('\n'):
-                line = line.strip()
-                if not line or line.startswith('#'): continue
-                if line.startswith('[') and line.endswith(']'):
-                    current_section = line[1:-1]
-                    profile_cfg[current_section] = {}
-                elif '=' in line:
-                    k, v = line.split('=', 1)
-                    val = v.strip().strip('"')
-                    if current_section: profile_cfg[current_section][k.strip()] = val
-                    else: profile_cfg[k.strip()] = val
+            if job['config']:
+                flat_cfg = json.loads(job['config'])
+                # Nest the flat config for the transcoder
+                profile_cfg = {'video': {}, 'audio': {}, 'output': {}}
+                for k, v in flat_cfg.items():
+                    if k.startswith('video_'): profile_cfg['video'][k[6:]] = v
+                    elif k.startswith('audio_'): profile_cfg['audio'][k[6:]] = v
+                    elif k.startswith('output_'): profile_cfg['output'][k[7:]] = v
+                    else: profile_cfg[k] = v
+            else:
+                # Fallback to profile file (legacy)
+                profile_content = config_mgr.read_profile(job['profile_name'])
+                if not profile_content:
+                    raise Exception(f"Profile {job['profile_name']} not found")
+                
+                current_section = ""
+                for line in profile_content.split('\n'):
+                    line = line.strip()
+                    if not line or line.startswith('#'): continue
+                    if line.startswith('[') and line.endswith(']'):
+                        current_section = line[1:-1]
+                        profile_cfg[current_section] = {}
+                    elif '=' in line:
+                        k, v = line.split('=', 1)
+                        val = v.strip().strip('"')
+                        if current_section: profile_cfg[current_section][k.strip()] = val
+                        else: profile_cfg[k.strip()] = val
 
             def update_progress(p):
                 wdb = get_db()
@@ -260,16 +274,18 @@ def add_job():
     
     # For now, let's assume the frontend sends the calculated output_path 
     # or we do it here based on the profile
-    profile_name = data.get('profile_path') # This is the rel path to the profile
-    
-    # We'll just use the provided output_path if it exists, else generate one
+    profile_name = data.get('profile_path')
+    config = data.get('config') # Full JSON config from UI
+    import json
+    config_json = json.dumps(config) if config else None
+
     output_path = data.get('output_path')
     if not output_path:
         output_path = os.path.join(out_dir, base_name + ".mkv")
 
     db = get_db()
-    db.execute("INSERT INTO jobs (input_path, output_path, profile_name) VALUES (?, ?, ?)",
-               (input_path, output_path, profile_name))
+    db.execute("INSERT INTO jobs (input_path, output_path, profile_name, config) VALUES (?, ?, ?, ?)",
+               (input_path, output_path, profile_name, config_json))
     db.commit()
     db.close()
     return jsonify({'success': True})
