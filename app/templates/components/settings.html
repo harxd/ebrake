@@ -6,5 +6,22 @@
             Leave empty to save transcoded files in the same directory as the source.
         </div>
     </div>
+    <div class="option-grid" style="margin-bottom: 2rem;">
+        <div class="form-group">
+            <label>Default Category</label>
+            <select class="input" id="setting-default_category" onchange="updateSettingsProfileDropdown()">
+                <option value="">None</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Default Profile</label>
+            <select class="input" id="setting-default_profile">
+                <option value="">None</option>
+            </select>
+        </div>
+    </div>
+    <div style="font-size: 0.75rem; color: var(--dim); margin-top: -1.5rem; margin-bottom: 2rem;">
+        These will be selected by default in the Create Job tab.
+    </div>
     <button class="btn" onclick="saveSettings()" id="save-settings-btn">Save Settings</button>
 </div>

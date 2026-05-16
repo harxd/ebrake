@@ -1,2 +1,2 @@
-media_dir = "/media"
 output_dir = ""
+default_profile = "Mobile/Medium Quality.ebrake"

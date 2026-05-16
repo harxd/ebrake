@@ -328,13 +328,26 @@ def add_job():
 
         # Determine output filename
         base_name = os.path.splitext(os.path.basename(input_path))[0]
+        suffix = config.get('output_suffix', '') if config else ''
         
         # We should use the extension from the config or profile
         ext = ".mkv"
         if config and config.get('output_container'):
             ext = "." + config['output_container']
         
-        output_path = os.path.join(out_dir, base_name + ext)
+        output_path = os.path.join(out_dir, base_name + suffix + ext)
+
+        # SAFETY NET: Ensure we never overwrite the source file or existing files
+        # Resolve real input path for comparison
+        rel_input = input_path
+        if rel_input.startswith('/media/'): rel_input = rel_input[7:]
+        elif rel_input.startswith('/media'): rel_input = rel_input[6:]
+        real_input_path = os.path.abspath(os.path.join(base_media, rel_input))
+        
+        counter = 1
+        while os.path.abspath(output_path) == real_input_path or os.path.exists(output_path):
+            output_path = os.path.join(out_dir, f"{base_name}{suffix} ({counter}){ext}")
+            counter += 1
 
         db.execute("INSERT INTO jobs (input_path, output_path, profile_name, config) VALUES (?, ?, ?, ?)",
                    (input_path, output_path, profile_name, config_json))

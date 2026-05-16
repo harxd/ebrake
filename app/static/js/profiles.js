@@ -1,5 +1,6 @@
 let profileDataTree = [];
 let currentProfilePath = '';
+let sessionSelectedProfile = null;
 
 async function initJobPresets() {
     const res = await fetch('/api/profiles');
@@ -9,11 +10,33 @@ async function initJobPresets() {
     const catSelect = document.getElementById('job-category');
     if (catSelect) {
         catSelect.innerHTML = profileDataTree.map(node => `<option value="${node.name}">${node.name}</option>`).join('');
+        
+        // Use manual selection if it was made in this page session
+        let initialPath = sessionSelectedProfile;
+        
+        if (!initialPath) {
+            // Otherwise try default from settings
+            try {
+                const settingsRes = await fetch('/api/settings');
+                const settingsData = await settingsRes.json();
+                initialPath = settingsData.default_profile;
+            } catch (e) {}
+        }
+
+        if (initialPath) {
+            // Find which category this profile belongs to
+            const cat = profileDataTree.find(c => c.children && c.children.some(p => p.path === initialPath));
+            if (cat) {
+                catSelect.value = cat.name;
+                updateJobPresetDropdown(initialPath);
+                return;
+            }
+        }
         updateJobPresetDropdown();
     }
 }
 
-function updateJobPresetDropdown() {
+function updateJobPresetDropdown(forcePath = null) {
     const catSelect = document.getElementById('job-category');
     if (!catSelect) return;
     const catName = catSelect.value;
@@ -23,6 +46,10 @@ function updateJobPresetDropdown() {
         presetSelect.innerHTML = catNode.children
             .filter(c => c.type === 'file')
             .map(c => `<option value="${c.path}">${c.name.replace(/\.(ebrake|toml)$/, '')}</option>`).join('');
+        
+        if (forcePath) {
+            presetSelect.value = forcePath;
+        }
     } else {
         presetSelect.innerHTML = '';
     }
@@ -34,6 +61,9 @@ async function loadJobPresetSettings() {
     if (!presetSelect) return;
     const path = presetSelect.value;
     if (!path) return;
+
+    // Track selection in global variable so it survives internal tab changes
+    sessionSelectedProfile = path;
 
     const res = await fetch(`/api/profiles/read?path=${encodeURIComponent(path)}`);
     const data = await res.json();
@@ -186,7 +216,10 @@ async function promptCreateDir(parent) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parent, name })
     });
-    if ((await res.json()).success) loadProfiles();
+    if ((await res.json()).success) {
+        window.createPresetsLoaded = false;
+        loadProfiles();
+    }
 }
 
 async function promptCreateFile(parent) {
@@ -197,7 +230,10 @@ async function promptCreateFile(parent) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parent, name })
     });
-    if ((await res.json()).success) loadProfiles();
+    if ((await res.json()).success) {
+        window.createPresetsLoaded = false;
+        loadProfiles();
+    }
 }
 
 async function deletePath(path) {
@@ -208,6 +244,7 @@ async function deletePath(path) {
         body: JSON.stringify({ path })
     });
     if ((await res.json()).success) {
+        window.createPresetsLoaded = false;
         loadProfiles();
         document.getElementById('profile-editor').style.display = 'none';
         document.getElementById('profile-details-empty').style.display = 'flex';
@@ -246,6 +283,7 @@ async function handleProfileDrop(e, dest) {
     });
     
     if ((await res.json()).success) {
+        window.createPresetsLoaded = false;
         loadProfiles();
     }
 }
@@ -283,6 +321,7 @@ async function saveProfile() {
 
     const result = await res.json();
     if (result.success) {
+        window.createPresetsLoaded = false;
         const btn = document.querySelector('#profile-editor .btn');
         const originalText = btn.innerText;
         btn.innerText = 'Saved!';

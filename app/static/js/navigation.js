@@ -14,7 +14,12 @@ function tab(id, pushState = true) {
     const btn = Array.from(document.querySelectorAll('.nav button')).find(b => b.getAttribute('onclick').includes(`'${id}'`));
     if (btn) btn.classList.add('active');
 
-    if (id === 'create') initJobPresets();
+    if (id === 'create') {
+        if (!window.createPresetsLoaded) {
+            initJobPresets();
+            window.createPresetsLoaded = true;
+        }
+    }
     if (id === 'jobs') fetchJobs();
     if (id === 'profiles') loadProfiles();
     if (id === 'settings') loadSettings();
