@@ -2,11 +2,10 @@ let jobsData = [];
 let currentJobSubTab = 'pending';
 
 const statusRank = {
-    'cancelled': 0,
-    'completed': 1,
-    'failed': 2,
-    'running': 3,
-    'pending': 4
+    'completed': 0,
+    'failed': 1,
+    'running': 2,
+    'pending': 3
 };
 
 let sortCol = null;
@@ -40,7 +39,7 @@ async function fetchJobs() {
         jobsData = await res.json();
         
         // Update counts
-        const counts = { pending: 0, completed: 0, cancelled: 0, failed: 0 };
+        const counts = { pending: 0, completed: 0, failed: 0 };
         jobsData.forEach(j => {
             if (counts[j.status] !== undefined) counts[j.status]++;
         });
@@ -201,11 +200,11 @@ function renderTable() {
 }
 
 async function addToQueue() {
-    const input_path = document.getElementById('selected-path').value;
+    const input_paths = Array.from(selectedFiles);
     const profile_path = document.getElementById('job-preset').value;
     
-    if (!input_path || input_path === 'No file selected') {
-        alert('Please select a file first');
+    if (input_paths.length === 0) {
+        alert('Please select at least one file');
         return;
     }
 
@@ -234,11 +233,18 @@ async function addToQueue() {
     const res = await fetch('/api/jobs/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input_path, profile_path, config })
+        body: JSON.stringify({ input_paths, profile_path, config })
     });
     
-    if ((await res.json()).success) {
+    const data = await res.json();
+    if (data.success) {
+        selectedFiles.clear();
+        updateSelectionUI();
         fetchJobs();
+        // Show success message or switch to jobs tab
+        showToast(`Added ${input_paths.length} job(s) to queue`);
+    } else {
+        alert('Failed to add jobs: ' + (data.error || 'Unknown error'));
     }
 }
 

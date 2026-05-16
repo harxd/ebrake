@@ -49,8 +49,8 @@ class Transcoder:
         if vid_cfg.get('pix_fmt'): cmd += ["-pix_fmt", vid_cfg.get('pix_fmt')]
         
         fps_mode = vid_cfg.get('fps_mode', 'cfr')
-        if fps_mode == 'cfr': cmd += ["-vsync", "1"]
-        else: cmd += ["-vsync", "2"]
+        if fps_mode == 'cfr': cmd += ["-fps_mode", "cfr"]
+        else: cmd += ["-fps_mode", "vfr"]
 
         # Audio Settings (Passthrough Logic)
         pt_codecs = [c.strip() for c in aud_cfg.get('passthrough_codecs', '').split(',') if c.strip()]

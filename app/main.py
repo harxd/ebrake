@@ -9,6 +9,17 @@ from watchdog.events import FileSystemEventHandler
 from config_loader import ConfigLoader
 from transcoder import Transcoder
 
+import logging
+import sys
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(process)d/%(threadName)s] %(levelname)s: %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger('ebrake')
+
 app = Flask(__name__)
 config_mgr = ConfigLoader()
 transcoder = Transcoder()
@@ -92,20 +103,51 @@ def get_db():
 
 # Background Worker
 def worker():
+    logger.info("Background worker started")
     while True:
         db = get_db()
-        job = db.execute("SELECT * FROM jobs WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1").fetchone()
-        if not job:
+        job_id = None
+        try:
+            # Use a transaction to atomically check and claim a job
+            db.execute("BEGIN IMMEDIATE")
+            
+            # Check if any job is currently running
+            running = db.execute("SELECT id FROM jobs WHERE status = 'running'").fetchone()
+            if running:
+                logger.info(f"Worker skipping: Job {running['id']} is currently running")
+                db.rollback()
+                db.close()
+                time.sleep(2)
+                continue
+            
+            # Pick the next pending job
+            job = db.execute("SELECT id FROM jobs WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1").fetchone()
+            if not job:
+                db.rollback()
+                db.close()
+                time.sleep(2)
+                continue
+            
+            job_id = job['id']
+            # Claim the job
+            db.execute("UPDATE jobs SET status = 'running', started_at = CURRENT_TIMESTAMP WHERE id = ?", (job_id,))
+            db.commit()
+            
+            logger.info(f"Claimed job {job_id}")
+            
+            # Fetch full job data for processing
+            job = db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
             db.close()
-            time.sleep(2)
+        except Exception as e:
+            logger.error(f"Worker loop error during claim: {e}")
+            try: db.rollback()
+            except: pass
+            db.close()
+            time.sleep(1)
             continue
 
-        job_id = job['id']
-        db.execute("UPDATE jobs SET status = 'running', started_at = CURRENT_TIMESTAMP WHERE id = ?", (job_id,))
-        db.commit()
-        db.close()
-
         try:
+            logger.info(f"Starting transcoding for job {job_id}: {job['input_path']}")
             # Load configuration
             import json
             profile_cfg = {}
@@ -171,20 +213,24 @@ def worker():
 
             fdb = get_db()
             if success:
+                logger.info(f"Job {job_id} completed successfully")
                 output_size = os.path.getsize(job['output_path'])
                 fdb.execute("UPDATE jobs SET status = 'completed', progress = 100, output_size = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?", (output_size, job_id))
             else:
+                logger.error(f"Job {job_id} failed: {error_log}")
                 fdb.execute("UPDATE jobs SET status = 'failed', error = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?", (error_log, job_id))
             fdb.commit()
             fdb.close()
 
         except Exception as e:
+            logger.error(f"Fatal error in worker processing job {job_id}: {e}")
             fdb = get_db()
             fdb.execute("UPDATE jobs SET status = 'failed', error = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?", (str(e), job_id))
             fdb.commit()
             fdb.close()
 
-threading.Thread(target=worker, daemon=True).start()
+if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
+    threading.Thread(target=worker, daemon=True).start()
 
 @app.route('/')
 @app.route('/create')
@@ -239,9 +285,9 @@ def clear_jobs():
     status = request.json.get('status') if request.is_json else None
     db = get_db()
     if status:
-        db.execute("UPDATE jobs SET status = 'cancelled', finished_at = CURRENT_TIMESTAMP WHERE status = ?", (status,))
+        db.execute("DELETE FROM jobs WHERE status = ?", (status,))
     else:
-        db.execute("UPDATE jobs SET status = 'cancelled', finished_at = CURRENT_TIMESTAMP")
+        db.execute("DELETE FROM jobs")
     db.commit()
     db.close()
     return jsonify({'success': True})
@@ -249,43 +295,50 @@ def clear_jobs():
 @app.route('/api/jobs/add', methods=['POST'])
 def add_job():
     data = request.json
-    input_path = data.get('input_path')
+    input_paths = data.get('input_paths')
+    if not input_paths:
+        input_path = data.get('input_path')
+        input_paths = [input_path] if input_path else []
+    
+    if not input_paths:
+        return jsonify({'error': 'No input paths provided'}), 400
+
     # Default output dir from settings
     settings = config_mgr.get_settings()
-    out_dir = settings.get('output_dir', '')
+    out_dir_setting = settings.get('output_dir', '')
     
     base_media = get_media_base()
-    
-    # If out_dir is empty, use source dir
-    if not out_dir:
-        # Resolve real input path to find its directory
-        rel_input = input_path
-        if rel_input.startswith('/media/'): rel_input = rel_input[7:]
-        elif rel_input.startswith('/media'): rel_input = rel_input[6:]
-        real_input_path = os.path.join(base_media, rel_input)
-        out_dir = os.path.dirname(real_input_path)
-    else:
-        out_dir = os.path.abspath(out_dir)
-
-    # Determine output filename
-    base_name = os.path.splitext(os.path.basename(input_path))[0]
-    # We should get container from profile, but for now use mkv or what's in data
-    # Actually, the frontend should send the desired output path or we calculate it here
-    
-    # For now, let's assume the frontend sends the calculated output_path 
-    # or we do it here based on the profile
     profile_name = data.get('profile_path')
     config = data.get('config') # Full JSON config from UI
     import json
     config_json = json.dumps(config) if config else None
 
-    output_path = data.get('output_path')
-    if not output_path:
-        output_path = os.path.join(out_dir, base_name + ".mkv")
-
     db = get_db()
-    db.execute("INSERT INTO jobs (input_path, output_path, profile_name, config) VALUES (?, ?, ?, ?)",
-               (input_path, output_path, profile_name, config_json))
+    for input_path in input_paths:
+        # If out_dir is empty, use source dir
+        if not out_dir_setting:
+            # Resolve real input path to find its directory
+            rel_input = input_path
+            if rel_input.startswith('/media/'): rel_input = rel_input[7:]
+            elif rel_input.startswith('/media'): rel_input = rel_input[6:]
+            real_input_path = os.path.join(base_media, rel_input)
+            out_dir = os.path.dirname(real_input_path)
+        else:
+            out_dir = os.path.abspath(out_dir_setting)
+
+        # Determine output filename
+        base_name = os.path.splitext(os.path.basename(input_path))[0]
+        
+        # We should use the extension from the config or profile
+        ext = ".mkv"
+        if config and config.get('output_container'):
+            ext = "." + config['output_container']
+        
+        output_path = os.path.join(out_dir, base_name + ext)
+
+        db.execute("INSERT INTO jobs (input_path, output_path, profile_name, config) VALUES (?, ?, ?, ?)",
+                   (input_path, output_path, profile_name, config_json))
+    
     db.commit()
     db.close()
     return jsonify({'success': True})
@@ -343,4 +396,5 @@ def get_media_version():
     return jsonify({'version': media_version})
 
 if __name__ == '__main__':
+    logger.info("Starting ebrake application...")
     app.run(debug=True, port=5000)
