@@ -162,17 +162,13 @@ class ConfigLoader:
     def get_settings(self):
         if not os.path.exists(self.settings_path):
             return {}
-        settings = {}
-        with open(self.settings_path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#') or '=' not in line:
-                    continue
-                parts = line.split('=', 1)
-                key = parts[0].strip()
-                val = parts[1].strip().strip('"')
-                settings[key] = val
-        return settings
+        import tomllib
+        try:
+            with open(self.settings_path, 'rb') as f:
+                return tomllib.load(f)
+        except Exception as e:
+            print(f"Error loading settings: {e}")
+            return {}
 
     def save_settings(self, settings):
         lines = []

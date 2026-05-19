@@ -31,21 +31,3 @@ function formatTime(sec) {
     const s = Math.floor(sec % 60).toString().padStart(2, '0');
     return `${h}:${m}:${s}`;
 }
-
-function parseTOML(content) {
-    const lines = content.split('\n');
-    const config = {};
-    let currentSection = '';
-
-    lines.forEach(line => {
-        line = line.trim();
-        if (!line || line.startsWith('#')) return;
-        const sectionMatch = line.match(/^\[(.*)\]$/);
-        if (sectionMatch) { currentSection = sectionMatch[1]; return; }
-        const match = line.match(/^([a-z0-9_]+)\s*=\s*"(.*)"/);
-        if (match) { config[currentSection ? `${currentSection}_${match[1]}` : match[1]] = match[2]; }
-        const matchNum = line.match(/^([a-z0-9_]+)\s*=\s*([0-9.]+)/);
-        if (matchNum) { config[currentSection ? `${currentSection}_${match[1]}` : match[1]] = matchNum[2]; }
-    });
-    return config;
-}

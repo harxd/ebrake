@@ -166,18 +166,8 @@ def worker():
                 if not profile_content:
                     raise Exception(f"Profile {job['profile_name']} not found")
                 
-                current_section = ""
-                for line in profile_content.split('\n'):
-                    line = line.strip()
-                    if not line or line.startswith('#'): continue
-                    if line.startswith('[') and line.endswith(']'):
-                        current_section = line[1:-1]
-                        profile_cfg[current_section] = {}
-                    elif '=' in line:
-                        k, v = line.split('=', 1)
-                        val = v.strip().strip('"')
-                        if current_section: profile_cfg[current_section][k.strip()] = val
-                        else: profile_cfg[k.strip()] = val
+                import tomllib
+                profile_cfg = tomllib.loads(profile_content)
 
             def update_progress(p):
                 wdb = get_db()
@@ -229,8 +219,28 @@ def worker():
             fdb.commit()
             fdb.close()
 
+def start_worker():
+    try:
+        import fcntl
+        os.makedirs(APPDATA_DIR, exist_ok=True)
+        lock_file = open(os.path.join(APPDATA_DIR, "worker.lock"), "w")
+        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        
+        worker_thread = threading.Thread(target=worker, daemon=True)
+        worker_thread.lock_file = lock_file
+        worker_thread.start()
+        logger.info("Successfully acquired worker lock and started background worker thread.")
+    except (BlockingIOError, PermissionError):
+        logger.info("Worker lock is held by another process. Skipping worker thread startup in this process.")
+    except ImportError:
+        logger.warning("fcntl not available. Starting worker thread without process locking.")
+        threading.Thread(target=worker, daemon=True).start()
+    except Exception as e:
+        logger.warning(f"Unexpected error acquiring worker lock: {e}. Starting worker anyway.")
+        threading.Thread(target=worker, daemon=True).start()
+
 if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
-    threading.Thread(target=worker, daemon=True).start()
+    start_worker()
 
 @app.route('/')
 @app.route('/create')
@@ -365,7 +375,19 @@ def read_profile():
     rel_path = request.args.get('path', '')
     content = config_mgr.read_profile(rel_path)
     if content is None: return jsonify({'error': 'Not found'}), 404
-    return jsonify({'content': content})
+    try:
+        import tomllib
+        parsed = tomllib.loads(content)
+        flat = {}
+        for section, keys in parsed.items():
+            if isinstance(keys, dict):
+                for k, v in keys.items():
+                    flat[f"{section}_{k}"] = v
+            else:
+                flat[section] = keys
+        return jsonify({'content': content, 'config': flat})
+    except Exception as e:
+        return jsonify({'error': f"Failed to parse TOML profile: {e}"}), 500
 
 @app.route('/api/profiles/save', methods=['POST'])
 def save_profile():

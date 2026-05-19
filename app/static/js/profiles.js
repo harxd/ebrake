@@ -69,7 +69,7 @@ async function loadJobPresetSettings() {
     const data = await res.json();
     if (data.error) return;
 
-    const config = parseTOML(data.content);
+    const config = data.config;
     const fields = [
         'output_suffix', 'output_container', 
         'video_codec', 'video_preset', 'video_crf', 'video_tune', 'video_pix_fmt', 'video_fps_mode',
@@ -178,7 +178,7 @@ async function selectProfile(path, name) {
         return;
     }
 
-    const config = parseTOML(data.content);
+    const config = data.config;
     const fields = [
         'output_suffix', 'output_container', 
         'video_codec', 'video_preset', 'video_crf', 'video_tune', 'video_pix_fmt', 'video_fps_mode',
