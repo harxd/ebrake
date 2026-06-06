@@ -31,19 +31,19 @@ Profiles:
 - Responsive design
 - Duplicate frames detection
 - VMAF
-- Privacy setting / Obfuscation
+- Privacy mode / Obfuscation
 - Subtitle handling
 - Hardware acceleration
 
 ## Implementation
 
 ### Profiles
-There shall be profile categories, as well as the profiles themselves. The whole system shall be directory and file based. As this application will run dockerized, the user will mount an appdata directory. Inside this appdata directory shall be a "profiles" directory, where our profile categories are stored as directories and the profiles are stored as TOML-based ".ebrake" files.  
+There shall be profile categories, as well as the profiles themselves. The whole system shall be directory and file based. As this application will run dockerized, the user will mount an appdata directory. Inside this appdata directory shall be a "profiles" directory, where our profile categories are stored as directories, and the profiles are stored as TOML-based ".ebrake" files.  
 
 Requirements:
 - Profiles MUST be inside categories
 - Categories CANNOT nest inside other categories
-- The content of the profile files is TOML-based sectioned into: video encoding, audio encoding, output formatting
+- The content of the profile files is TOML-based, sectioned into: video encoding, audio encoding, output formatting
 
 Profile TOML content:
 - Video encoding
@@ -61,3 +61,24 @@ Profile TOML content:
 - Output formatting
   - Output suffix: string
   - Container: name (e.g. mkv)
+
+### Jobs SQL Schema
+column | type | description
+-------|------|------------
+id | INTEGER | primary key
+status | TEXT | `pending`, `running`, `completed`, `failed`, `cancelled`
+created_at | DATETIME | when job was created
+updated_at | DATETIME | when job was updated
+started_at | DATETIME | when job was started
+finished_at | DATETIME | when job was finished
+failed_at | DATETIME | when job failed
+cancelled_at | DATETIME | when job was cancelled
+duration | INTEGER | time it took to complete in seconds
+relative_size | INTEGER | output size as a percentage of input size
+input_path | TEXT | input file path
+output_path | TEXT | output file path
+priority | INTEGER | job priority
+category | TEXT | name of the preset category
+preset | TEXT | name of the .ebrake preset used
+ffmpeg | TEXT | complete ffmpeg command
+error | TEXT | error message
