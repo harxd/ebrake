@@ -1,5 +1,5 @@
 # ebrake
-ffmpeg-based transcoding web app
+ffmpeg-based transcoding web app, distributed as Docker/Podman container.
 
 ### Stack
 - **Backend**: FastAPI + Uvicorn
