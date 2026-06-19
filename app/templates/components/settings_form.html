@@ -1,0 +1,61 @@
+<form hx-post="/api/settings" hx-target="#settings-form-wrapper" class="settings-form">
+    
+    {% if success_msg %}
+        <div class="alert alert-success">{{ success_msg }}</div>
+        
+        <!-- Out-of-band updates to sync the body class state for Privacy Mode -->
+        <script>
+            // Update the Alpine global store state immediately
+            if (window.Alpine) {
+                const isEnabled = {{ 'true' if privacy_mode_enabled else 'false' }};
+                Alpine.store('privacy').active = isEnabled;
+                
+                if (isEnabled) {
+                    document.body.classList.add('privacy-enabled');
+                } else {
+                    document.body.classList.remove('privacy-enabled');
+                }
+            }
+        </script>
+    {% endif %}
+    
+    <div class="panel-section">
+        <h4 class="section-title"><i class="fa-solid fa-triangle-exclamation"></i> Crash Recovery & Boot Action</h4>
+        <p class="section-desc">Select what the application should do with jobs left in "running" state when the app boots up (e.g. after container crash or host power loss).</p>
+        
+        <div class="form-group">
+            <label>Startup Recovery Mode</label>
+            <select name="recovery_action" class="form-control">
+                <option value="mark_failed_pause" {% if on_startup_orphaned_job_action == 'mark_failed_pause' %}selected{% endif %}>
+                    Mark Failed & Pause: Mark failed and wait for manual resume (Default)
+                </option>
+                <option value="mark_failed_resume" {% if on_startup_orphaned_job_action == 'mark_failed_resume' %}selected{% endif %}>
+                    Mark Failed & Resume: Mark failed and process next jobs automatically
+                </option>
+                <option value="auto_restart" {% if on_startup_orphaned_job_action == 'auto_restart' %}selected{% endif %}>
+                    Auto-Restart: Delete partial files and re-run jobs immediately
+                </option>
+            </select>
+        </div>
+    </div>
+    
+    <div class="panel-section">
+        <h4 class="section-title"><i class="fa-solid fa-user-shield"></i> Security & Privacy Mode</h4>
+        <p class="section-desc">Privacy Mode blurs all file names, directory paths, and ffmpeg log command displays inside the UI. Useful when running ebrake in cafes, libraries, or offices.</p>
+        
+        <div class="form-group checkbox-group">
+            <label class="checkbox-container">
+                <input type="checkbox" name="privacy_mode" value="true" {% if privacy_mode_enabled %}checked{% endif %}>
+                <span class="checkmark"></span>
+                <span>Enable Privacy Mode (Blur filenames globally)</span>
+            </label>
+        </div>
+    </div>
+    
+    <div class="form-actions-left">
+        <button type="submit" class="btn btn-primary btn-large">
+            <i class="fa-solid fa-floppy-disk"></i> Save System Settings
+        </button>
+    </div>
+    
+</form>

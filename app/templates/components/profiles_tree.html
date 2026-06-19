@@ -1,0 +1,71 @@
+<div class="profiles-tree-wrapper">
+    
+    <!-- Create Category Form inline -->
+    <div class="inline-add-form">
+        <form hx-post="/api/profiles/category/create" hx-target="#profiles-tree-root">
+            <div class="input-group">
+                <input type="text" name="name" placeholder="New Category Name..." class="form-control form-control-sm" required>
+                <button type="submit" class="btn btn-sm btn-primary">
+                    <i class="fa-solid fa-folder-plus"></i> Add
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <ul class="category-tree">
+        {% for cat, presets in profiles_tree.items() %}
+            <li class="category-tree-item">
+                <div class="category-header">
+                    <span class="category-title-row">
+                        <i class="fa-solid fa-folder-open text-folder"></i>
+                        <strong>{{ cat }}</strong>
+                    </span>
+                    <button class="btn-action-icon text-danger" 
+                            hx-delete="/api/profiles/category/{{ cat }}" 
+                            hx-target="#profiles-tree-root"
+                            hx-confirm="Are you sure you want to delete the category '{{ cat }}' and all its presets?"
+                            title="Delete Category">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                
+                <ul class="preset-tree-list">
+                    {% for preset in presets %}
+                        <li class="preset-tree-item"
+                            hx-get="/api/profiles/config-fields?category={{ cat | urlencode }}&name={{ preset | urlencode }}"
+                            hx-target="#profile-config-container"
+                            hx-trigger="click">
+                            <span class="preset-title">
+                                <i class="fa-solid fa-sliders text-preset"></i>
+                                <span class="preset-name-text">{{ preset }}</span>
+                            </span>
+                            <button class="btn-action-icon text-danger" 
+                                    hx-delete="/api/profiles/{{ cat | urlencode }}/{{ preset | urlencode }}" 
+                                    hx-target="#profiles-tree-root"
+                                    hx-confirm="Delete preset '{{ preset }}'?"
+                                    title="Delete Preset"
+                                    onclick="event.stopPropagation()">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </li>
+                    {% else %}
+                        <li class="preset-tree-item empty-presets">
+                            <span class="text-muted">No presets inside category</span>
+                        </li>
+                    {% endfor %}
+                    
+                    <!-- Inline Add Preset trigger -->
+                    <li class="add-preset-row-item">
+                        <button class="btn btn-link btn-xs" onclick="createNewPresetForm('{{ cat }}')">
+                            <i class="fa-solid fa-plus"></i> New Preset
+                        </button>
+                    </li>
+                </ul>
+            </li>
+        {% else %}
+            <div class="empty-state-small">
+                <p>No categories found.</p>
+            </div>
+        {% endfor %}
+    </ul>
+</div>

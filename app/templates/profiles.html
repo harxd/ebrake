@@ -1,0 +1,39 @@
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Profile Presets Editor</h1>
+        <p class="page-subtitle">Manage category directories and modify custom TOML configuration profiles</p>
+    </div>
+</div>
+
+<div class="two-column-layout">
+    
+    <!-- Left Column: Categories and Presets folder tree -->
+    <div class="panel card glass">
+        <div class="panel-header-row">
+            <h3 class="panel-title"><i class="fa-solid fa-folder"></i> Preset Categories</h3>
+        </div>
+        
+        <div id="profiles-tree-root">
+            {% include "components/profiles_tree.html" %}
+        </div>
+    </div>
+    
+    <!-- Right Column: Profile Editor Workstation -->
+    <div class="panel card glass" id="profile-config-container">
+        <div class="empty-state">
+            <i class="fa-solid fa-sliders text-muted"></i>
+            <h3>No Preset Selected</h3>
+            <p>Select a preset from the categories tree on the left to edit, or click "New Preset" under any folder category to create one from scratch.</p>
+        </div>
+    </div>
+    
+</div>
+
+<script>
+    function createNewPresetForm(category) {
+        htmx.ajax('GET', `/api/profiles/config-fields?category=${encodeURIComponent(category)}`, {
+            target: '#profile-config-container',
+            swap: 'innerHTML'
+        });
+    }
+</script>

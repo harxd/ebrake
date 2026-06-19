@@ -1,0 +1,711 @@
+import os
+import logging
+from pathlib import Path
+from contextlib import asynccontextmanager
+from typing import Dict, Any, List, Optional
+from fastapi import FastAPI, Request, Form, HTTPException, BackgroundTasks
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+
+from app.config import init_directories, PROFILES_DIR, MEDIA_DIR
+from app.database import (
+    init_db, get_jobs, get_job, create_job, update_job, delete_job,
+    get_setting, set_setting, get_media_files, search_media_files,
+    add_to_transcode_next, insert_into_transcode_next, reorder_transcode_next,
+    remove_from_transcode_next
+)
+from app.profiles import (
+    init_profiles, get_all_profiles, get_profile, save_profile,
+    delete_profile, create_category, delete_category, list_categories, list_profiles
+)
+from app.scanner import run_library_sync, start_periodic_scanner, is_library_syncing
+from app.engine import (
+    start_worker, recover_orphaned_jobs, cancel_running_job,
+    resume_queue, pause_queue, queue_paused, get_running_progress,
+    run_dedup_dryrun, run_vmaf_comparison, run_vmaf_search, probe_video,
+    TEMP_DIR
+)
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize application directories
+    init_directories()
+    # Initialize SQLite database schema
+    init_db()
+    # Populate profile templates if empty
+    init_profiles()
+    # Recover orphaned transcoding processes
+    recover_orphaned_jobs()
+    # Start background transcoding thread
+    start_worker()
+    # Launch background periodic 30-min media scanner
+    scanner_task = asyncio.create_task(start_periodic_scanner())
+    yield
+    # Cleanup background scanner on shutdown
+    scanner_task.cancel()
+
+import asyncio
+
+app = FastAPI(title="ebrake Transcoder", lifespan=lifespan)
+
+# Setup Templates and Static assets mapping
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="app/templates")
+
+# Context processor for templates to supply global states
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    # Retrieve current global privacy mode settings
+    request.state.privacy_mode = get_setting("privacy_mode_enabled", False)
+    request.state.queue_paused = queue_paused
+    response = await call_next(request)
+    return response
+
+def render_page(request: Request, template_name: str, context: Dict[str, Any] = None) -> HTMLResponse:
+    """Helper to render hybrid templates: full base shell vs standalone fragment."""
+    if context is None:
+        context = {}
+        
+    # Inject request details and state flags
+    context["request"] = request
+    context["privacy_mode_enabled"] = get_setting("privacy_mode_enabled", False)
+    context["queue_paused"] = queue_paused
+    
+    is_htmx = request.headers.get("HX-Request") == "true"
+    
+    if is_htmx:
+        # Return page fragment directly
+        return templates.TemplateResponse(request, template_name, context)
+    else:
+        # Return base layout shell wrapping target page template
+        context["page_template"] = template_name
+        return templates.TemplateResponse(request, "base.html", context)
+
+# PAGE ROUTES
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return RedirectResponse(url="/create-job")
+
+@app.get("/create-job", response_class=HTMLResponse)
+async def create_job_page(request: Request):
+    profiles_tree = get_all_profiles()
+    categories = list_categories()
+    
+    # Load first category profiles as default listing
+    default_category = categories[0] if categories else ""
+    default_presets = list_profiles(default_category) if default_category else []
+    
+    # Load parameters for the first preset if exists
+    default_profile_data = None
+    if default_category and default_presets:
+        default_profile_data = get_profile(default_category, default_presets[0])
+        
+    context = {
+        "active_tab": "create-job",
+        "profiles_tree": profiles_tree,
+        "categories": categories,
+        "current_category": default_category,
+        "presets": default_presets,
+        "profile": default_profile_data,
+        "media_root": str(MEDIA_DIR)
+    }
+    return render_page(request, "create_job.html", context)
+
+@app.get("/jobs", response_class=HTMLResponse)
+async def jobs_page(request: Request):
+    # Fetch queue segments
+    jobs = get_jobs()
+    pending = [j for j in jobs if j["status"] == "pending"]
+    running = [j for j in jobs if j["status"] == "running"]
+    completed = [j for j in jobs if j["status"] == "completed"]
+    failed = [j for j in jobs if j["status"] == "failed"]
+    cancelled = [j for j in jobs if j["status"] == "cancelled"]
+    
+    # Split pending into Transcode Next vs Priority queue
+    transcode_next = [j for j in pending if j["transcode_next_position"] is not None]
+    normal_queue = [j for j in pending if j["transcode_next_position"] is None]
+    
+    context = {
+        "active_tab": "jobs",
+        "transcode_next": transcode_next,
+        "normal_queue": normal_queue,
+        "running": running,
+        "history": completed + failed + cancelled
+    }
+    return render_page(request, "jobs.html", context)
+
+@app.get("/profiles", response_class=HTMLResponse)
+async def profiles_page(request: Request):
+    profiles_tree = get_all_profiles()
+    categories = list_categories()
+    
+    context = {
+        "active_tab": "profiles",
+        "profiles_tree": profiles_tree,
+        "categories": categories
+    }
+    return render_page(request, "profiles.html", context)
+
+@app.get("/tools", response_class=HTMLResponse)
+async def tools_page(request: Request):
+    context = {
+        "active_tab": "tools",
+        "media_root": str(MEDIA_DIR)
+    }
+    return render_page(request, "tools.html", context)
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+    context = {
+        "active_tab": "settings",
+        "on_startup_orphaned_job_action": get_setting("on_startup_orphaned_job_action", "mark_failed_pause"),
+        "privacy_mode_enabled": get_setting("privacy_mode_enabled", False),
+        "appdata_path": str(Path(os.getenv("EBRAKE_APPDATA_DIR", "./appdata")).resolve()),
+        "media_path": str(MEDIA_DIR)
+    }
+    return render_page(request, "settings.html", context)
+
+# API ENDPOINTS - MEDIA BROWSER & SCANNER
+
+@app.get("/api/media/search", response_class=HTMLResponse)
+async def api_media_search(request: Request, q: str = "", current_dir: str = ""):
+    """Returns matching cached filenames (or directory structure if empty)."""
+    if not q:
+        # Fallback to listing directories
+        target_dir = current_dir if current_dir else str(MEDIA_DIR)
+        target_path = Path(target_dir).resolve()
+        
+        # Security boundaries check
+        if not str(target_path).startswith(str(MEDIA_DIR.resolve())):
+            target_path = MEDIA_DIR.resolve()
+            
+        files_list = []
+        
+        # Display folder going upwards if not at media root
+        if target_path != MEDIA_DIR.resolve():
+            files_list.append({
+                "path": str(target_path.parent),
+                "name": ".. [Up One Level]",
+                "parent_path": str(target_path.parent.parent),
+                "is_dir": 1,
+                "size": 0,
+                "mtime": 0.0
+            })
+            
+        try:
+            with os.scandir(target_path) as it:
+                for entry in it:
+                    stat = entry.stat(follow_symlinks=False)
+                    is_dir = entry.is_dir(follow_symlinks=False)
+                    files_list.append({
+                        "path": str(Path(entry.path).resolve()),
+                        "name": entry.name,
+                        "parent_path": str(target_path),
+                        "is_dir": 1 if is_dir else 0,
+                        "size": stat.st_size if not is_dir else 0,
+                        "mtime": stat.st_mtime
+                    })
+        except OSError:
+            pass
+            
+        # Order folders first
+        files_list.sort(key=lambda x: (x["name"] == ".. [Up One Level]", not x["is_dir"], x["name"].lower()))
+    else:
+        # Search via cache DB
+        files_list = search_media_files(q)
+        
+    return templates.TemplateResponse(request, "components/file_browser_list.html", {
+        "files": files_list,
+        "current_dir": current_dir if current_dir else str(MEDIA_DIR),
+        "query": q
+    })
+
+@app.post("/api/media/sync", response_class=HTMLResponse)
+async def api_media_sync(request: Request, background_tasks: BackgroundTasks):
+    """Triggers file scanner in background thread."""
+    if not is_library_syncing():
+        background_tasks.add_task(run_library_sync)
+        
+    return """
+    <button class="btn btn-icon" 
+            hx-get="/api/media/sync/status" 
+            hx-trigger="every 1s" 
+            hx-swap="outerHTML" 
+            disabled>
+        <i class="fa-solid fa-circle-notch fa-spin"></i>
+        <span>Updating</span>
+    </button>
+    """
+
+@app.get("/api/media/sync/status", response_class=HTMLResponse)
+async def api_media_sync_status(request: Request):
+    """Check sync progress and return active/disabled button accordingly."""
+    if is_library_syncing():
+        return """
+        <button class="btn btn-icon" 
+                hx-get="/api/media/sync/status" 
+                hx-trigger="every 1s" 
+                hx-swap="outerHTML" 
+                disabled>
+            <i class="fa-solid fa-circle-notch fa-spin"></i>
+            <span>Updating</span>
+        </button>
+        """
+    else:
+        return """
+        <button class="btn btn-icon" 
+                hx-post="/api/media/sync" 
+                hx-swap="outerHTML" 
+                title="Rescan media directory">
+            <i class="fa-solid fa-rotate"></i>
+            <span>Update search db</span>
+        </button>
+        """
+
+# API ENDPOINTS - PROFILES MANAGEMENT
+
+@app.get("/api/profiles/select", response_class=HTMLResponse)
+async def api_profile_select_preset(request: Request, category: str, preset: str):
+    """Loads a preset details configurations to pre-populate configuration overrides panel."""
+    profile_data = get_profile(category, preset)
+    if not profile_data:
+        raise HTTPException(status_code=404, detail="Preset profile not found")
+        
+    return templates.TemplateResponse(request, "components/profile_overrides.html", {
+        "profile": profile_data
+    })
+
+@app.get("/api/profiles/presets-list", response_class=HTMLResponse)
+async def api_profiles_list_presets(request: Request, category: str):
+    """Fetches list of presets inside a category."""
+    presets = list_profiles(category)
+    return "".join([f"<option value='{p}'>{p}</option>" for p in presets])
+
+@app.get("/api/profiles/config-fields", response_class=HTMLResponse)
+async def api_profile_config_fields(request: Request, category: str, name: Optional[str] = None):
+    """Returns a full preset config form for editing inside Profiles tab."""
+    profile_data = get_profile(category, name) if name else None
+    return templates.TemplateResponse(request, "components/profile_config_form.html", {
+        "category": category,
+        "preset_name": name,
+        "profile": profile_data
+    })
+
+@app.post("/api/profiles/save", response_class=HTMLResponse)
+async def api_profile_save(
+    request: Request,
+    category: str = Form(...),
+    preset_name: str = Form(...),
+    codec: str = Form(...),
+    preset: str = Form(...),
+    crf: int = Form(...),
+    visual_tune: int = Form(0),
+    fps: str = Form("same as source"),
+    fps_mode: str = Form("constant"),
+    pixel_format: str = Form("yuv420p"),
+    target_vmaf: float = Form(0.0),
+    vmaf_min: int = Form(18),
+    vmaf_max: int = Form(30),
+    dedup: bool = Form(False),
+    passthrough_codecs: List[str] = Form([]),
+    fallback_codec: str = Form("aac"),
+    fallback_bitrate: int = Form(192000),
+    sub_mode: str = Form("none"),
+    burn_in_track_select: str = Form("default"),
+    output_suffix: str = Form(""),
+    container: str = Form("mkv")
+):
+    """Save/update preset ebrake TOML file."""
+    # Build profile structure
+    profile_data = {
+        "video": {
+            "codec": codec,
+            "preset": preset,
+            "crf": crf,
+            "visual_tune": visual_tune,
+            "fps": fps,
+            "fps_mode": fps_mode,
+            "pixel_format": pixel_format
+        },
+        "optimization": {
+            "target_vmaf": target_vmaf,
+            "vmaf_search_range": [vmaf_min, vmaf_max],
+            "duplicate_frame_detection": dedup,
+            "duplicate_threshold": 0.001
+        },
+        "audio": {
+            "passthrough_codecs": passthrough_codecs,
+            "fallback_codec": fallback_codec,
+            "fallback_bitrate": fallback_bitrate
+        },
+        "subtitles": {
+            "mode": sub_mode,
+            "languages": ["all"],
+            "burn_in_track_select": burn_in_track_select
+        },
+        "output": {
+            "output_suffix": output_suffix,
+            "container": container
+        }
+    }
+    
+    success = save_profile(category, preset_name, profile_data)
+    
+    # Return HTML message + reload categories tree
+    response_html = f"<div class='alert alert-success'>Preset '{preset_name}' saved successfully.</div>"
+    # Trigger categories out-of-band updates
+    response_html += templates.TemplateResponse(request, "components/profiles_tree.html", {
+        "profiles_tree": get_all_profiles(),
+        "categories": list_categories()
+    }, headers={"HX-Trigger": "profileChanged"}).body.decode()
+    
+    return HTMLResponse(content=response_html)
+
+@app.post("/api/profiles/category/create", response_class=HTMLResponse)
+async def api_create_category(request: Request, name: str = Form(...)):
+    """Create new category folder."""
+    create_category(name)
+    return templates.TemplateResponse(request, "components/profiles_tree.html", {
+        "profiles_tree": get_all_profiles(),
+        "categories": list_categories()
+    })
+
+@app.delete("/api/profiles/category/{name}", response_class=HTMLResponse)
+async def api_delete_category(request: Request, name: str):
+    """Delete a profile category folder recursively."""
+    delete_category(name)
+    return templates.TemplateResponse(request, "components/profiles_tree.html", {
+        "profiles_tree": get_all_profiles(),
+        "categories": list_categories()
+    })
+
+@app.delete("/api/profiles/{category}/{name}", response_class=HTMLResponse)
+async def api_delete_profile(request: Request, category: str, name: str):
+    """Delete preset .ebrake file."""
+    delete_profile(category, name)
+    return templates.TemplateResponse(request, "components/profiles_tree.html", {
+        "profiles_tree": get_all_profiles(),
+        "categories": list_categories()
+    })
+
+# API ENDPOINTS - JOBS CRUD & QUEUE REORDERING
+
+@app.post("/api/jobs", response_class=HTMLResponse)
+async def api_create_job(
+    request: Request,
+    input_path: str = Form(...),
+    category: str = Form(...),
+    preset: str = Form(...),
+    priority: int = Form(0),
+    codec: str = Form(...),
+    preset_val: str = Form(...), # Preset name (e.g. fast)
+    crf: int = Form(...),
+    visual_tune: int = Form(0),
+    fps: str = Form("same as source"),
+    fps_mode: str = Form("constant"),
+    pixel_format: str = Form("yuv420p"),
+    target_vmaf: float = Form(0.0),
+    vmaf_min: int = Form(18),
+    vmaf_max: int = Form(30),
+    dedup: bool = Form(False),
+    passthrough_codecs: List[str] = Form([]),
+    fallback_codec: str = Form("aac"),
+    fallback_bitrate: int = Form(192000),
+    sub_mode: str = Form("none"),
+    burn_in_track_select: str = Form("default"),
+    output_suffix: str = Form(""),
+    container: str = Form("mkv")
+):
+    """Validate configurations, compute outputs paths (handling collisions), and insert job."""
+    in_file = Path(input_path)
+    if not in_file.exists():
+        raise HTTPException(status_code=400, detail="Input file does not exist.")
+        
+    # Check is_customized comparison with original profile values
+    original = get_profile(category, preset)
+    is_customized = 0
+    if original:
+        orig_vid = original.get("video", {})
+        if (orig_vid.get("codec") != codec or
+            str(orig_vid.get("preset")) != preset_val or
+            orig_vid.get("crf") != crf or
+            orig_vid.get("fps") != fps or
+            orig_vid.get("fps_mode") != fps_mode or
+            orig_vid.get("pixel_format") != pixel_format or
+            float(original.get("optimization", {}).get("target_vmaf", 0.0)) != target_vmaf or
+            bool(original.get("optimization", {}).get("duplicate_frame_detection", False)) != dedup or
+            original.get("audio", {}).get("passthrough_codecs", []) != passthrough_codecs or
+            original.get("subtitles", {}).get("mode", "none") != sub_mode):
+            is_customized = 1
+
+    # Compile the final configuration parameters used
+    resolved_config = {
+        "video": {
+            "codec": codec,
+            "preset": preset_val,
+            "crf": crf,
+            "visual_tune": visual_tune,
+            "fps": fps,
+            "fps_mode": fps_mode,
+            "pixel_format": pixel_format
+        },
+        "optimization": {
+            "target_vmaf": target_vmaf,
+            "vmaf_search_range": [vmaf_min, vmaf_max],
+            "duplicate_frame_detection": dedup,
+            "duplicate_threshold": 0.001
+        },
+        "audio": {
+            "passthrough_codecs": passthrough_codecs,
+            "fallback_codec": fallback_codec,
+            "fallback_bitrate": fallback_bitrate
+        },
+        "subtitles": {
+            "mode": sub_mode,
+            "languages": ["all"],
+            "burn_in_track_select": burn_in_track_select
+        },
+        "output": {
+            "output_suffix": output_suffix,
+            "container": container
+        }
+    }
+    
+    # Calculate output file path with collision avoidance
+    out_dir = in_file.parent
+    base_stem = in_file.stem
+    cand_name = f"{base_stem}{output_suffix}.{container}"
+    out_file = out_dir / cand_name
+    
+    # Avoid collisions
+    counter = 1
+    while out_file.exists():
+        cand_name = f"{base_stem}{output_suffix}_{counter}.{container}"
+        out_file = out_dir / cand_name
+        counter += 1
+        
+    # Map model DB fields
+    job_data = {
+        "status": "pending",
+        "input_path": str(in_file.resolve()),
+        "output_path": str(out_file.resolve()),
+        "priority": priority,
+        "category": category,
+        "preset": preset,
+        "is_customized": is_customized,
+        "preset_config": json.dumps(resolved_config),
+        "subtitle_mode": sub_mode,
+        "target_vmaf": target_vmaf if target_vmaf > 0 else None,
+        "selected_crf": crf if target_vmaf <= 0 else None
+    }
+    
+    create_job(job_data)
+    
+    # Start transcoding worker
+    start_worker()
+    
+    # Redirect user to the jobs queue page via HTMX header
+    return HTMLResponse(content="", headers={"HX-Redirect": "/jobs"})
+
+# JSON Models for sorting reordering payloads
+class ReorderPayload(BaseModel):
+    job_id: int
+    from_pos: int
+    to_pos: int
+
+class TranscodeNextPayload(BaseModel):
+    job_id: int
+    target_pos: int
+
+@app.post("/api/jobs/reorder", response_class=HTMLResponse)
+async def api_reorder_jobs(request: Request, payload: ReorderPayload):
+    """Handles drag'n'drop sorting indices reordering within Transcode Next queue."""
+    reorder_transcode_next(payload.job_id, payload.from_pos, payload.to_pos)
+    return await render_queues_fragment(request)
+
+@app.post("/api/jobs/transcode-next", response_class=HTMLResponse)
+async def api_add_transcode_next(request: Request, payload: TranscodeNextPayload):
+    """Inserts a job into Transcode Next list at a target position index."""
+    insert_into_transcode_next(payload.job_id, payload.target_pos)
+    return await render_queues_fragment(request)
+
+@app.post("/api/jobs/{id}/append-transcode-next", response_class=HTMLResponse)
+async def api_append_transcode_next(request: Request, id: int):
+    """Pushes a pending job to the end of the Transcode Next queue."""
+    add_to_transcode_next(id)
+    return await render_queues_fragment(request)
+
+@app.delete("/api/jobs/transcode-next/{id}", response_class=HTMLResponse)
+async def api_remove_transcode_next(request: Request, id: int):
+    """Removes a job from Transcode Next back to standard priority list."""
+    remove_from_transcode_next(id)
+    return await render_queues_fragment(request)
+
+@app.post("/api/jobs/{id}/cancel", response_class=HTMLResponse)
+async def api_cancel_job(request: Request, id: int):
+    """Cancels a running or pending transcoding job."""
+    cancel_running_job(id)
+    return await render_queues_fragment(request)
+
+@app.post("/api/jobs/{id}/delete", response_class=HTMLResponse)
+async def api_delete_job(request: Request, id: int):
+    """Deletes job from database history."""
+    delete_job(id)
+    return await render_queues_fragment(request)
+
+@app.post("/api/queue/start", response_class=HTMLResponse)
+async def api_start_queue(request: Request):
+    """Resume workers queues execution loop."""
+    resume_queue()
+    return await render_queues_fragment(request)
+
+@app.post("/api/queue/pause", response_class=HTMLResponse)
+async def api_pause_queue(request: Request):
+    """Pause workers queues execution loop."""
+    pause_queue()
+    return await render_queues_fragment(request)
+
+@app.get("/api/jobs/poll-queues", response_class=HTMLResponse)
+async def api_poll_queues(request: Request):
+    """Polled by HTMX every few seconds to refresh running/pending tables with live status updates."""
+    return await render_queues_fragment(request)
+
+async def render_queues_fragment(request: Request) -> HTMLResponse:
+    """Helper to return rendered queues fragment for HTMX updates."""
+    jobs = get_jobs()
+    pending = [j for j in jobs if j["status"] == "pending"]
+    running = [j for j in jobs if j["status"] == "running"]
+    completed = [j for j in jobs if j["status"] == "completed"]
+    failed = [j for j in jobs if j["status"] == "failed"]
+    cancelled = [j for j in jobs if j["status"] == "cancelled"]
+    
+    # Inject live progress details
+    for run_job in running:
+        progress_data = get_running_progress(run_job["id"])
+        if progress_data:
+            run_job.update(progress_data)
+            
+    transcode_next = [j for j in pending if j["transcode_next_position"] is not None]
+    normal_queue = [j for j in pending if j["transcode_next_position"] is None]
+    
+    return templates.TemplateResponse(request, "components/queues_list.html", {
+        "transcode_next": transcode_next,
+        "normal_queue": normal_queue,
+        "running": running,
+        "history": completed + failed + cancelled,
+        "queue_paused": queue_paused
+    })
+
+# API ENDPOINTS - SYSTEM SETTINGS
+
+@app.post("/api/settings", response_class=HTMLResponse)
+async def api_save_settings(
+    request: Request,
+    recovery_action: str = Form("mark_failed_pause"),
+    privacy_mode: bool = Form(False)
+):
+    """Updates database configuration variables."""
+    set_setting("on_startup_orphaned_job_action", recovery_action)
+    set_setting("privacy_mode_enabled", privacy_mode)
+    
+    # Return form with success message badge
+    return templates.TemplateResponse(request, "components/settings_form.html", {
+        "on_startup_orphaned_job_action": recovery_action,
+        "privacy_mode_enabled": privacy_mode,
+        "appdata_path": str(Path(os.getenv("EBRAKE_APPDATA_DIR", "./appdata")).resolve()),
+        "media_path": str(MEDIA_DIR),
+        "success_msg": "Settings saved successfully."
+    })
+
+# API ENDPOINTS - STANDALONE DRY-RUN TOOLS
+
+@app.post("/api/tools/dedup", response_class=HTMLResponse)
+async def api_tool_dedup(request: Request, file_path: str = Form(...)):
+    """Triggers FPS Deduplication scanning on input."""
+    p = Path(file_path)
+    if not p.exists():
+        return "<div class='alert alert-danger'>File not found.</div>"
+        
+    try:
+        results = run_dedup_dryrun(p)
+        return templates.TemplateResponse(request, "components/tool_dedup_result.html", {
+            "results": results
+        })
+    except Exception as e:
+        return f"<div class='alert alert-danger'>Deduplication scan failed: {e}</div>"
+
+@app.post("/api/tools/vmaf", response_class=HTMLResponse)
+async def api_tool_vmaf(
+    request: Request,
+    file_path: str = Form(...),
+    codec: str = Form(...),
+    preset: str = Form(...),
+    crf: int = Form(...),
+    pixel_format: str = Form("yuv420p"),
+    dedup: bool = Form(False)
+):
+    """Triggers VMAF scoring simulation on a sample segment of input."""
+    p = Path(file_path)
+    if not p.exists():
+        return "<div class='alert alert-danger'>File not found.</div>"
+        
+    try:
+        meta = probe_video(p)
+        duration = meta["duration"]
+        
+        # Test CRF on midpoint 10s segment
+        ts = duration * 0.5
+        segment_duration = 10.0
+        
+        temp_out = TEMP_DIR / f"dryrun_vmaf_{int(time.time())}.mp4"
+        
+        # Setup test transcode
+        cmd = [
+            "ffmpeg", "-y",
+            "-ss", f"{ts:.3f}", "-t", f"{segment_duration:.3f}", "-i", str(p),
+            "-c:v", codec, "-crf", str(crf), "-preset", preset,
+            "-pix_fmt", pixel_format
+        ]
+        
+        vf_filters = []
+        if dedup:
+            vf_filters.append("mpdecimate")
+        if vf_filters:
+            cmd += ["-vf", ",".join(vf_filters)]
+            
+        cmd += ["-an", "-sn", str(temp_out)]
+        
+        # Run test transcode
+        subprocess.run(cmd, capture_output=True, check=True)
+        
+        # Calculate size scaling estimates
+        in_segment_size = p.stat().st_size * (segment_duration / duration) if duration > 0 else 1
+        out_segment_size = temp_out.stat().st_size
+        size_scaling = int((out_segment_size / in_segment_size) * 100) if in_segment_size > 0 else 100
+        
+        # Compare VMAF
+        vmaf_score = run_vmaf_comparison(
+            ref_path=p,
+            dist_path=temp_out,
+            start_time=ts,
+            duration=segment_duration,
+            use_mpdecimate=dedup
+        )
+        
+        # Clean up
+        if temp_out.exists():
+            temp_out.unlink()
+            
+        return templates.TemplateResponse(request, "components/tool_vmaf_result.html", {
+            "vmaf_score": vmaf_score,
+            "size_scaling": size_scaling,
+            "crf": crf
+        })
+    except Exception as e:
+        return f"<div class='alert alert-danger'>VMAF scan failed: {e}</div>"

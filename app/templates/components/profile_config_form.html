@@ -1,0 +1,35 @@
+<form hx-post="/api/profiles/save" hx-target="#profile-save-status">
+    
+    <div class="panel-header-row">
+        <h3 class="panel-title">
+            <i class="fa-solid fa-file-pen"></i> 
+            Editing Preset: <strong class="text-primary">{{ preset_name | default('New Preset') }}</strong> in <strong class="text-folder">{{ category }}</strong>
+        </h3>
+    </div>
+    
+    <div id="profile-save-status"></div>
+    
+    <!-- Hidden Category and Name settings -->
+    <input type="hidden" name="category" value="{{ category }}">
+    
+    <div class="form-group">
+        <label>Preset Name (Will be saved as filename.ebrake)</label>
+        <input type="text" name="preset_name" class="form-control" value="{{ preset_name | default('') }}" placeholder="e.g. AV1 Ultra Quality" required 
+               {% if preset_name %}readonly{% endif %}>
+        {% if preset_name %}<span class="input-tip">Preset name cannot be renamed directly. Create a new preset to change names.</span>{% endif %}
+    </div>
+    
+    <hr class="divider">
+    
+    <!-- We leverage the exact same variables structure as overrides -->
+    {% set profile = profile | default({'video':{'codec':'libx264','preset':'fast','crf':22,'fps':'same as source','fps_mode':'constant','pixel_format':'yuv420p'},'optimization':{'target_vmaf':0.0,'vmaf_search_range':[18,30],'duplicate_frame_detection':false},'audio':{'passthrough_codecs':['aac','ac3'],'fallback_codec':'aac','fallback_bitrate':192000},'subtitles':{'mode':'none','burn_in_track_select':'default'},'output':{'output_suffix':'_transcoded','container':'mkv'}}) %}
+    
+    {% include "components/profile_overrides.html" %}
+    
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary btn-large">
+            <i class="fa-solid fa-save"></i> Save Profile Preset
+        </button>
+    </div>
+    
+</form>

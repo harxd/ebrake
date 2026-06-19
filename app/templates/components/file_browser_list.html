@@ -1,0 +1,59 @@
+<ul class="file-list-group">
+    {% for file in files %}
+        <li class="file-item {% if file.is_dir %}dir-item{% else %}video-item{% endif %}"
+            {% if file.is_dir %}
+                hx-get="/api/media/search?current_dir={{ file.path | urlencode }}"
+                hx-target="#file-list"
+                hx-trigger="click"
+            {% else %}
+                onclick="selectFile('{{ file.path | replace('\\', '\\\\') }}', '{{ file.name }}')"
+            {% endif %}>
+            
+            <div class="file-info-row">
+                <span class="file-icon">
+                    {% if file.is_dir %}
+                        <i class="fa-solid fa-folder text-folder"></i>
+                    {% else %}
+                        <i class="fa-solid fa-file-video text-video"></i>
+                    {% endif %}
+                </span>
+                <span class="file-name privacy-sensitive">{{ file.name }}</span>
+            </div>
+            
+            {% if not file.is_dir %}
+                <span class="file-size">{{ (file.size / 1024 / 1024) | round(1) }} MB</span>
+            {% endif %}
+        </li>
+    {% else %}
+        <li class="file-item empty-item">
+            {% if query %}
+                <span>No file containing "{{ query }}" was found.</span>
+            {% else %}
+                <span>No files found in directory cache. Click "Update search db" to index files.</span>
+            {% endif %}
+        </li>
+    {% endfor %}
+</ul>
+
+<script>
+    function selectFile(path, name) {
+        const inputField = document.getElementById('input_path_field');
+        const toolInputField = document.getElementById('tool_file_path_field');
+        const selectedLabel = document.getElementById('selected_file_label');
+        
+        if (inputField) {
+            inputField.value = path;
+        }
+        if (toolInputField) {
+            toolInputField.value = path;
+        }
+        if (selectedLabel) {
+            selectedLabel.innerText = name;
+            selectedLabel.classList.remove('no-file');
+        }
+        
+        // Visual selection state
+        document.querySelectorAll('.video-item').forEach(el => el.classList.remove('selected'));
+        event.currentTarget.classList.add('selected');
+    }
+</script>

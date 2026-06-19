@@ -1,0 +1,52 @@
+<div class="result-card card glass-accent">
+    <h4 class="result-title"><i class="fa-solid fa-gauge-high"></i> VMAF Scan Results</h4>
+    
+    <div class="metrics-grid-2">
+        <div class="metric-box">
+            <span class="metric-label">VMAF Score</span>
+            <span class="metric-value 
+                {% if vmaf_score >= 95 %}text-success
+                {% elif vmaf_score >= 90 %}text-primary
+                {% elif vmaf_score >= 80 %}text-warning
+                {% else %}text-danger
+                {% endif %}">
+                {{ vmaf_score | round(2) }}
+            </span>
+        </div>
+        <div class="metric-box">
+            <span class="metric-label">Estimated Output Size</span>
+            <span class="metric-value text-accent">{{ size_scaling }}% of source</span>
+        </div>
+    </div>
+    
+    <hr class="divider">
+    
+    <div class="vmaf-rating-banner 
+        {% if vmaf_score >= 95 %}rating-excellent
+        {% elif vmaf_score >= 90 %}rating-good
+        {% else %}rating-warning
+        {% endif %}">
+        <i class="fa-solid fa-award"></i>
+        <span>
+            Quality Rating: 
+            <strong>
+                {% if vmaf_score >= 95 %}Excellent Quality (Visually Lossless)
+                {% elif vmaf_score >= 90 %}Very Good Quality (High Efficiency)
+                {% elif vmaf_score >= 80 %}Good Quality (Medium Efficiency)
+                {% else %}Lower Quality (High Compression)
+                {% endif %}
+            </strong>
+        </span>
+    </div>
+    
+    <div class="stats-list">
+        <div class="stats-row">
+            <span>Tested CRF Value:</span>
+            <strong>{{ crf }}</strong>
+        </div>
+        <div class="stats-row">
+            <span>Size reduction:</span>
+            <strong class="text-success">-{{ 100 - size_scaling }}%</strong>
+        </div>
+    </div>
+</div>

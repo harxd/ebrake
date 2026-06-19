@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ebrake - High Performance Transcoding</title>
+    
+    <!-- Google Fonts Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Core Styling -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    
+    <!-- HTMX, Alpine.js, and Sortable.js -->
+    <script src="https://unpkg.com/htmx.org@1.9.10" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    
+    <!-- Alpine.js Core and Store Initialization -->
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.store('privacy', {
+                active: false,
+                snoozed: sessionStorage.getItem('privacy_snoozed') === 'true',
+                
+                init() {
+                    // Sync active state from body class rendered by server
+                    this.active = document.body.classList.contains('privacy-enabled');
+                },
+                
+                toggleSnooze() {
+                    this.snoozed = !this.snoozed;
+                    sessionStorage.setItem('privacy_snoozed', this.snoozed ? 'true' : 'false');
+                }
+            });
+        });
+    </script>
+    <script src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js" defer></script>
+</head>
+<body class="{% if privacy_mode_enabled %}privacy-enabled{% endif %}"
+      x-data
+      :class="{'privacy-active': $store.privacy.active && !$store.privacy.snoozed}">
+
+    <div class="app-container">
+        
+        <!-- Sidebar Navigation (collapses to bottom on mobile) -->
+        <nav class="sidebar">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-gears churn-1"></i>
+                    <i class="fa-solid fa-film churn-2"></i>
+                </div>
+                <span class="logo-text">ebrake</span>
+            </div>
+            
+            <ul class="nav-links" 
+                x-data="{ activeTab: window.location.pathname }"
+                @popstate.window="activeTab = window.location.pathname">
+                <li>
+                    <a href="/create-job" 
+                       hx-get="/create-job" 
+                       hx-target="#main-content" 
+                       hx-push-url="true" 
+                       @click="activeTab = '/create-job'"
+                       :class="{'active': activeTab === '/create-job' || activeTab === '/'}">
+                        <i class="fa-solid fa-plus-circle"></i>
+                        <span>Create Job</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/jobs" 
+                       hx-get="/jobs" 
+                       hx-target="#main-content" 
+                       hx-push-url="true" 
+                       @click="activeTab = '/jobs'"
+                       :class="{'active': activeTab === '/jobs'}">
+                        <i class="fa-solid fa-list-ul"></i>
+                        <span>Jobs</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/profiles" 
+                       hx-get="/profiles" 
+                       hx-target="#main-content" 
+                       hx-push-url="true" 
+                       @click="activeTab = '/profiles'"
+                       :class="{'active': activeTab === '/profiles'}">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span>Profiles</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/tools" 
+                       hx-get="/tools" 
+                       hx-target="#main-content" 
+                       hx-push-url="true" 
+                       @click="activeTab = '/tools'"
+                       :class="{'active': activeTab === '/tools'}">
+                        <i class="fa-solid fa-screwdriver-wrench"></i>
+                        <span>Tools</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/settings" 
+                       hx-get="/settings" 
+                       hx-target="#main-content" 
+                       hx-push-url="true" 
+                       @click="activeTab = '/settings'"
+                       :class="{'active': activeTab === '/settings'}">
+                        <i class="fa-solid fa-cog"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
+            </ul>
+            
+            <!-- Quick-Snooze Toggle for Privacy Mode -->
+            <div class="privacy-toggle-wrapper" x-show="$store.privacy.active">
+                <button class="btn-privacy-toggle" 
+                        @click="$store.privacy.toggleSnooze()" 
+                        :class="{'snoozed': $store.privacy.snoozed}"
+                        title="Toggle Privacy Snooze">
+                    <i class="fa-solid" :class="$store.privacy.snoozed ? 'fa-eye-slash' : 'fa-eye'"></i>
+                    <span class="toggle-label" x-text="$store.privacy.snoozed ? 'Show Titles' : 'Blur Titles'"></span>
+                </button>
+            </div>
+        </nav>
+        
+        <!-- Main Content Area -->
+        <main class="content-wrapper">
+            <div id="main-content" class="fade-in-up">
+                {% if page_template %}
+                    {% include page_template %}
+                {% endif %}
+            </div>
+            
+            <!-- Persistent Transcode Status Footer -->
+            <footer class="status-footer" 
+                    hx-get="/api/jobs/poll-queues" 
+                    hx-trigger="every 3s" 
+                    hx-target="#queues-container"
+                    hx-swap="innerHTML">
+                <div class="footer-inner">
+                    <div class="footer-title">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                        <span>Status Engine: Active</span>
+                    </div>
+                    <div class="footer-status" id="footer-status-indicator">
+                        <!-- Filled dynamically when queues update -->
+                        <span>Ready to Transcode</span>
+                    </div>
+                </div>
+            </footer>
+        </main>
+        
+    </div>
+
+    <!-- Core Scripts -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

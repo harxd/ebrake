@@ -1,0 +1,76 @@
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Transcoding Queue & Jobs</h1>
+        <p class="page-subtitle">Track active conversions, manage queue orders, and view execution history</p>
+    </div>
+</div>
+
+<!-- Container refreshed automatically by footer trigger and user interactions -->
+<div id="queues-container" hx-get="/api/jobs/poll-queues" hx-trigger="load">
+    <div class="loading-state">
+        <i class="fa-solid fa-circle-notch fa-spin"></i>
+        <p>Loading queue systems...</p>
+    </div>
+</div>
+
+<script>
+    // Global function to initialize Sortable dragging lists
+    function initQueueSortable() {
+        const nextList = document.getElementById('transcode-next-list');
+        const normalList = document.getElementById('normal-queue-list');
+        
+        if (nextList) {
+            new Sortable(nextList, {
+                group: 'queues',
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                handle: '.drag-handle',
+                onEnd: function(evt) {
+                    // Sorting within Transcode Next
+                    const jobId = evt.item.dataset.id;
+                    const fromPos = evt.oldIndex;
+                    const toPos = evt.newIndex;
+                    
+                    if (fromPos === toPos) return;
+                    
+                    htmx.ajax('POST', '/api/jobs/reorder', {
+                        values: { job_id: jobId, from_pos: fromPos, to_pos: toPos },
+                        target: '#queues-container',
+                        swap: 'innerHTML'
+                    });
+                },
+                onAdd: function(evt) {
+                    // Moved from Normal Queue to Transcode Next
+                    const jobId = evt.item.dataset.id;
+                    const targetPos = evt.newIndex;
+                    
+                    htmx.ajax('POST', '/api/jobs/transcode-next', {
+                        values: { job_id: jobId, target_pos: targetPos },
+                        target: '#queues-container',
+                        swap: 'innerHTML'
+                    });
+                }
+            });
+        }
+        
+        if (normalList) {
+            new Sortable(normalList, {
+                group: {
+                    name: 'queues',
+                    pull: true,
+                    put: false // Dragging out is allowed, but dragging into is priority-based only
+                },
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                handle: '.drag-handle'
+            });
+        }
+    }
+
+    // Bind to HTMX loaded events
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail.target.id === 'queues-container') {
+            initQueueSortable();
+        }
+    });
+</script>

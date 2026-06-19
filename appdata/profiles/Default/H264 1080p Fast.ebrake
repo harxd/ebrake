@@ -1,0 +1,28 @@
+[video]
+codec = "libx264"
+preset = "fast"
+crf = 22
+visual_tune = 0
+fps = "same as source"
+fps_mode = "constant"
+pixel_format = "yuv420p"
+
+[optimization]
+target_vmaf = 0.0
+vmaf_search_range = [ 18, 28,]
+duplicate_frame_detection = false
+duplicate_threshold = 0.001
+
+[audio]
+passthrough_codecs = [ "aac", "ac3", "mp3",]
+fallback_codec = "aac"
+fallback_bitrate = 128000
+
+[subtitles]
+mode = "none"
+languages = [ "eng",]
+burn_in_track_select = "default"
+
+[output]
+output_suffix = "-1080p-fast"
+container = "mp4"

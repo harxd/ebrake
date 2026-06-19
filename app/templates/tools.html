@@ -1,0 +1,169 @@
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Standalone Utility Tools</h1>
+        <p class="page-subtitle">Perform dry-runs for frame rate matching and quality simulations without creating database jobs</p>
+    </div>
+</div>
+
+<div class="two-column-layout" x-data="{ activeTool: 'dedup' }">
+    
+    <!-- Left Column: File Browser selector -->
+    <div class="panel card glass">
+        <div class="panel-header-row">
+            <h3 class="panel-title"><i class="fa-solid fa-folder-open"></i> Select Source Video</h3>
+            <div class="browser-controls">
+                <button class="btn btn-icon" hx-post="/api/media/sync" hx-swap="outerHTML">
+                    <i class="fa-solid fa-rotate"></i>
+                    <span>Sync</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="selected-file-banner">
+            <div class="banner-icon"><i class="fa-solid fa-file-video"></i></div>
+            <div class="banner-text-details">
+                <span class="label-header">Source File</span>
+                <span class="file-name-display no-file" id="selected_file_label">Select a file in the browser below</span>
+            </div>
+        </div>
+        
+        <!-- Search input box -->
+        <div class="search-box-wrapper">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input type="text" name="q" placeholder="Filter files..." class="search-input"
+                   hx-get="/api/media/search" hx-trigger="keyup changed delay:300ms" hx-target="#file-list" hx-indicator="#search-loading">
+            <span id="search-loading" class="htmx-indicator loader-inline"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
+        </div>
+        
+        <div class="file-browser-container" id="file-list" hx-get="/api/media/search" hx-trigger="load">
+            <div class="loading-state">
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+                <p>Loading files index...</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Column: Dry-Run Workspaces -->
+    <div class="panel card glass flex-column">
+        
+        <!-- Tabs selectors -->
+        <div class="tabs-header">
+            <button class="tab-btn" :class="{ 'active': activeTool === 'dedup' }" @click="activeTool = 'dedup'">
+                <i class="fa-solid fa-gauge-simple"></i> FPS Deduplication
+            </button>
+            <button class="tab-btn" :class="{ 'active': activeTool === 'vmaf' }" @click="activeTool = 'vmaf'">
+                <i class="fa-solid fa-gauge-high"></i> VMAF Quality Simulator
+            </button>
+        </div>
+        
+        <!-- Tab Content: FPS Deduplication -->
+        <div class="tab-content" x-show="activeTool === 'dedup'">
+            <div class="tab-instruction">
+                <h4>FPS Deduplication Dry-Run</h4>
+                <p>Scans the selected video stream to count identical adjacent frames. Calculates potential space savings if encoded with variable frame rate drop (`mpdecimate`).</p>
+            </div>
+            
+            <form hx-post="/api/tools/dedup" hx-target="#dedup-result-container" hx-indicator="#dedup-loading">
+                <input type="hidden" name="file_path" id="tool_file_path_field" required>
+                
+                <div class="form-actions-left">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-square-poll-vertical"></i> Run Deduplication Scan
+                    </button>
+                    <span id="dedup-loading" class="htmx-indicator loader-badge"><i class="fa-solid fa-spinner fa-spin"></i> Scanning frames...</span>
+                </div>
+            </form>
+            
+            <div id="dedup-result-container" class="tool-result-box">
+                <div class="placeholder-result text-muted">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <p>Select a video file and click run to analyze frames.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tab Content: VMAF Quality Simulator -->
+        <div class="tab-content" x-show="activeTool === 'vmaf'">
+            <div class="tab-instruction">
+                <h4>VMAF Quality Simulator</h4>
+                <p>Simulates quality and file size output by transcoding a small 10-second segment at the center of the video with your configurations.</p>
+            </div>
+            
+            <form hx-post="/api/tools/vmaf" hx-target="#vmaf-result-container" hx-indicator="#vmaf-loading">
+                <input type="hidden" name="file_path" id="tool_file_path_field_vmaf" required>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Codec</label>
+                        <select name="codec" class="form-control" onchange="toggleToolPresetOptions(this.value)">
+                            <option value="libsvtav1">SVT-AV1 (libsvtav1)</option>
+                            <option value="libx265">H.265 (libx265)</option>
+                            <option value="libx264">H.264 (libx264)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Preset</label>
+                        <input type="text" name="preset" id="tool_preset_input" class="form-control" value="6" placeholder="e.g. 6 or fast">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>CRF (Constant Rate Factor)</label>
+                        <input type="number" name="crf" class="form-control" value="24" min="0" max="51">
+                    </div>
+                    <div class="form-group">
+                        <label>Pixel Format</label>
+                        <select name="pixel_format" class="form-control">
+                            <option value="yuv420p">yuv420p (8-bit)</option>
+                            <option value="yuv420p10le" selected>yuv420p10le (10-bit HDR)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" name="dedup" value="true">
+                        <span class="checkmark"></span>
+                        <span>Enable FPS Deduplication (`mpdecimate` sync)</span>
+                    </label>
+                </div>
+                
+                <div class="form-actions-left">
+                    <button type="submit" class="btn btn-primary" onclick="syncVmafFilePath()">
+                        <i class="fa-solid fa-play"></i> Run VMAF Quality Scan
+                    </button>
+                    <span id="vmaf-loading" class="htmx-indicator loader-badge"><i class="fa-solid fa-spinner fa-spin"></i> Running quality tests...</span>
+                </div>
+            </form>
+            
+            <div id="vmaf-result-container" class="tool-result-box">
+                <div class="placeholder-result text-muted">
+                    <i class="fa-solid fa-award"></i>
+                    <p>Select a video file and click run to calculate scores.</p>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+    
+</div>
+
+<script>
+    function toggleToolPresetOptions(codec) {
+        const presetInput = document.getElementById('tool_preset_input');
+        if (!presetInput) return;
+        
+        if (codec === 'libsvtav1') {
+            presetInput.value = '6';
+        } else {
+            presetInput.value = 'fast';
+        }
+    }
+
+    function syncVmafFilePath() {
+        // Sync the hidden file path fields
+        const sourcePath = document.getElementById('tool_file_path_field').value;
+        document.getElementById('tool_file_path_field_vmaf').value = sourcePath;
+    }
+</script>

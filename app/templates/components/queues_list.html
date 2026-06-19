@@ -1,0 +1,236 @@
+<!-- Queue Controller Status Panel -->
+<div class="control-panel card glass">
+    <div class="control-left">
+        <span class="status-badge {% if queue_paused %}status-paused{% else %}status-active{% endif %}">
+            <i class="fa-solid {% if queue_paused %}fa-circle-pause{% else %}fa-circle-check{% endif %}"></i>
+            Queue Status: {% if queue_paused %}PAUSED{% else %}ACTIVE{% endif %}
+        </span>
+    </div>
+    <div class="control-right">
+        {% if queue_paused %}
+            <button class="btn btn-success" hx-post="/api/queue/start" hx-target="#queues-container">
+                <i class="fa-solid fa-play"></i> Resume Queue Processing
+            </button>
+        {% else %}
+            <button class="btn btn-warning" hx-post="/api/queue/pause" hx-target="#queues-container">
+                <i class="fa-solid fa-pause"></i> Pause Queue Processing
+            </button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="queues-grid">
+
+    <!-- Left Column: Pending Queues -->
+    <div class="queues-column">
+        
+        <!-- Active Job Card -->
+        <div class="panel card glass">
+            <h3 class="panel-title"><i class="fa-solid fa-gear fa-spin"></i> Active Transcodes</h3>
+            
+            {% for job in running %}
+                <div class="running-job-card">
+                    <div class="job-meta-row">
+                        <span class="job-filename privacy-sensitive" title="{{ job.input_path }}">{{ job.input_path.split('\\')[-1].split('/')[-1] }}</span>
+                        <span class="badge badge-running">RUNNING</span>
+                    </div>
+                    
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" style="width: {{ job.progress | default(0) }}%"></div>
+                    </div>
+                    
+                    <div class="progress-details">
+                        <div class="metric-box">
+                            <span class="metric-label">Progress</span>
+                            <span class="metric-value">{{ job.progress | default(0) | round(1) }}%</span>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-label">Speed</span>
+                            <span class="metric-value">{{ job.speed | default('0x') }}</span>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-label">FPS</span>
+                            <span class="metric-value">{{ job.fps | default(0) | round(1) }}</span>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-label">ETA</span>
+                            <span class="metric-value">{{ job.eta | default('Calculating...') }}</span>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-label">Target CRF</span>
+                            <span class="metric-value">{{ job.selected_crf | default('Auto') }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="card-actions">
+                        <button class="btn btn-danger btn-sm" hx-post="/api/jobs/{{ job.id }}/cancel" hx-target="#queues-container">
+                            <i class="fa-solid fa-circle-stop"></i> Cancel Job
+                        </button>
+                    </div>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-film text-muted"></i>
+                    <p>No active transcoding jobs.</p>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Transcode Next Queue -->
+        <div class="panel card glass">
+            <h3 class="panel-title"><i class="fa-solid fa-forward-fast"></i> Transcode Next (Drag to reorder)</h3>
+            <div class="queue-list-wrapper">
+                <ul class="queue-group sortable-list" id="transcode-next-list">
+                    {% for job in transcode_next %}
+                        <li class="queue-item" data-id="{{ job.id }}">
+                            <div class="item-left">
+                                <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
+                                <span class="index-badge">#{{ loop.index }}</span>
+                                <span class="item-name privacy-sensitive" title="{{ job.input_path }}">{{ job.input_path.split('\\')[-1].split('/')[-1] }}</span>
+                            </div>
+                            <div class="item-right">
+                                <span class="badge preset-badge">{{ job.category }}/{{ job.preset }}</span>
+                                <button class="btn-action-icon" hx-delete="/api/jobs/transcode-next/{{ job.id }}" hx-target="#queues-container" title="Remove from Transcode Next">
+                                    <i class="fa-solid fa-arrow-down-long"></i>
+                                </button>
+                                <button class="btn-action-icon text-danger" hx-post="/api/jobs/{{ job.id }}/cancel" hx-target="#queues-container" title="Cancel Job">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </li>
+                    {% else %}
+                        <div class="empty-state-small">
+                            <p>Transcode Next queue is empty. Drag files here to prioritize them.</p>
+                        </div>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Normal Priority Queue -->
+        <div class="panel card glass">
+            <h3 class="panel-title"><i class="fa-solid fa-list-ol"></i> Priority Queue (Normal pending order)</h3>
+            <div class="queue-list-wrapper">
+                <ul class="queue-group sortable-list" id="normal-queue-list">
+                    {% for job in normal_queue %}
+                        <li class="queue-item" data-id="{{ job.id }}">
+                            <div class="item-left">
+                                <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
+                                <span class="priority-badge">P: {{ job.priority }}</span>
+                                <span class="item-name privacy-sensitive" title="{{ job.input_path }}">{{ job.input_path.split('\\')[-1].split('/')[-1] }}</span>
+                            </div>
+                            <div class="item-right">
+                                <span class="badge preset-badge">{{ job.category }}/{{ job.preset }}</span>
+                                <button class="btn-action-icon" hx-post="/api/jobs/{{ job.id }}/append-transcode-next" hx-target="#queues-container" title="Promote to Transcode Next">
+                                    <i class="fa-solid fa-arrow-up-long"></i>
+                                </button>
+                                <button class="btn-action-icon text-danger" hx-post="/api/jobs/{{ job.id }}/cancel" hx-target="#queues-container" title="Cancel Job">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </li>
+                    {% else %}
+                        <div class="empty-state-small">
+                            <p>No pending priority jobs.</p>
+                        </div>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Right Column: History Logs -->
+    <div class="queues-column">
+        <div class="panel card glass flex-grow">
+            <h3 class="panel-title"><i class="fa-solid fa-clock-rotate-left"></i> Transcode History</h3>
+            
+            <div class="history-table-wrapper">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>File Name</th>
+                            <th>Status</th>
+                            <th>Details</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for job in history %}
+                            <tr class="history-row">
+                                <td class="file-cell">
+                                    <span class="file-cell-name privacy-sensitive" title="{{ job.input_path }}">{{ job.input_path.split('\\')[-1].split('/')[-1] }}</span>
+                                    <span class="file-cell-path privacy-sensitive" title="{{ job.output_path }}">{{ job.output_path }}</span>
+                                </td>
+                                <td>
+                                    {% if job.status == 'completed' %}
+                                        <span class="badge badge-success">COMPLETED</span>
+                                    {% elif job.status == 'cancelled' %}
+                                        <span class="badge badge-gray">CANCELLED</span>
+                                    {% else %}
+                                        <span class="badge badge-danger">FAILED</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="history-details">
+                                        {% if job.status == 'completed' %}
+                                            <span>CRF: <strong>{{ job.selected_crf | default('Auto') }}</strong></span>
+                                            <span>Size: <strong>{{ job.relative_size }}%</strong></span>
+                                            <span>VMAF: <strong>{{ job.measured_vmaf | round(1) if job.measured_vmaf else 'N/A' }}</strong></span>
+                                            <span>Time: <strong>{{ job.duration }}s</strong></span>
+                                        {% elif job.status == 'failed' %}
+                                            <span class="text-danger error-log" title="{{ job.error }}">{{ job.error }}</span>
+                                        {% else %}
+                                            <span class="text-muted">User Cancelled</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <button class="btn-action-icon text-muted" 
+                                            hx-post="/api/jobs/{{ job.id }}/delete" 
+                                            hx-target="#queues-container"
+                                            hx-confirm="Are you sure you want to delete this job history record?"
+                                            title="Delete Record">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="4" class="empty-table-cell">
+                                    <i class="fa-solid fa-folder-open text-muted"></i>
+                                    <p>No historical jobs found.</p>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Out-Of-Band (OOB) Footer status swap -->
+<div id="footer-status-indicator" hx-swap-oob="true">
+    {% if running %}
+        <span class="footer-running-indicator">
+            <i class="fa-solid fa-circle-notch fa-spin"></i>
+            Encoding: <strong class="privacy-sensitive">{{ running[0].input_path.split('\\')[-1].split('/')[-1] }}</strong> ({{ running[0].progress | default(0) | round(0) }}%)
+        </span>
+    {% elif transcode_next or normal_queue %}
+        {% if queue_paused %}
+            <span class="footer-ready-indicator text-warning">
+                <i class="fa-solid fa-pause"></i> Queue Paused ({{ transcode_next|length + normal_queue|length }} jobs pending)
+            </span>
+        {% else %}
+            <span class="footer-ready-indicator text-success">
+                <i class="fa-solid fa-hourglass-start"></i> Waiting: {{ transcode_next|length + normal_queue|length }} jobs pending
+            </span>
+        {% endif %}
+    {% else %}
+        <span class="footer-idle-indicator text-muted">
+            <i class="fa-solid fa-circle-check"></i> System Idle
+        </span>
+    {% endif %}
+</div>
