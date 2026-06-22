@@ -153,10 +153,10 @@ def run_dedup_dryrun(file_path: Path) -> Dict[str, Any]:
 
     # Threshold for full scan: 180 seconds (3 minutes)
     if duration <= 180.0:
-        # Run full scan
+        # Run full scan (use strict parameters)
         cmd_dedup = [
             "ffmpeg", "-y", "-i", str(file_path),
-            "-vf", "mpdecimate", "-f", "null", "-"
+            "-vf", "mpdecimate=max=0:hi=64:lo=64:frac=0.001", "-f", "null", "-"
         ]
         p_dedup = subprocess.run(cmd_dedup, capture_output=True, text=True)
         
@@ -166,15 +166,14 @@ def run_dedup_dryrun(file_path: Path) -> Dict[str, Any]:
         dropped_frames = total_frames - unique_frames
     else:
         # Run sampled scan
-        num_segments = 10
-        segment_duration = 10.0
+        num_segments = 15
+        segment_duration = 15.0
         
         # Distribute segments evenly in the middle 70% of the video
         start_min = duration * 0.15
         start_max = max(start_min, duration * 0.85 - segment_duration)
         
-        total_sample_expected = 0
-        total_sample_unique = 0
+        segment_ratios = []
         
         for i in range(num_segments):
             if num_segments > 1:
@@ -187,7 +186,7 @@ def run_dedup_dryrun(file_path: Path) -> Dict[str, Any]:
                 "-ss", f"{start_time:.3f}",
                 "-t", f"{segment_duration:.3f}",
                 "-i", str(file_path),
-                "-vf", "mpdecimate",
+                "-vf", "mpdecimate=max=0:hi=64:lo=64:frac=0.001",
                 "-f", "null", "-"
             ]
             
@@ -196,15 +195,19 @@ def run_dedup_dryrun(file_path: Path) -> Dict[str, Any]:
             
             segment_expected = int(segment_duration * source_fps)
             segment_unique = int(unique_matches[-1]) if unique_matches else segment_expected
+            segment_unique = min(segment_unique, segment_expected)
             
-            total_sample_expected += segment_expected
-            total_sample_unique += min(segment_unique, segment_expected)
+            segment_dup_ratio = (segment_expected - segment_unique) / segment_expected if segment_expected > 0 else 0.0
+            segment_ratios.append(segment_dup_ratio)
             
-        # Calculate duplicate ratio from samples
-        if total_sample_expected > 0:
-            dup_ratio = (total_sample_expected - total_sample_unique) / total_sample_expected
+        # Outlier rejection using trimmed mean
+        segment_ratios.sort()
+        # Discard the top 3 and bottom 3 segments
+        trimmed_ratios = segment_ratios[3:-3]
+        if trimmed_ratios:
+            dup_ratio = sum(trimmed_ratios) / len(trimmed_ratios)
         else:
-            dup_ratio = 0.0
+            dup_ratio = sum(segment_ratios) / len(segment_ratios) if segment_ratios else 0.0
             
         dropped_frames = int(dup_ratio * total_frames)
         unique_frames = total_frames - dropped_frames
@@ -221,7 +224,7 @@ def run_dedup_dryrun(file_path: Path) -> Dict[str, Any]:
         "saved_space_pct": saved_space_pct
     }
 
-def run_vmaf_comparison(ref_path: Path, dist_path: Path, start_time: float, duration: float, use_mpdecimate: bool) -> float:
+def run_vmaf_comparison(ref_path: Path, dist_path: Path, start_time: float, duration: float, use_mpdecimate: bool, duplicate_threshold: float = 0.001) -> float:
     """
     Computes VMAF on segment samples.
     Saves JSON results and returns mean score.
@@ -231,7 +234,7 @@ def run_vmaf_comparison(ref_path: Path, dist_path: Path, start_time: float, dura
     
     filter_complex = ""
     if use_mpdecimate:
-        filter_complex = f"[0:v]mpdecimate[ref];[1:v]null[dist];[ref][dist]libvmaf=log_fmt=json:log_path='{escaped_log}'"
+        filter_complex = f"[0:v]mpdecimate=max=0:hi=64:lo=64:frac={duplicate_threshold}[ref];[1:v]null[dist];[ref][dist]libvmaf=log_fmt=json:log_path='{escaped_log}'"
     else:
         filter_complex = f"[0:v]null[ref];[1:v]null[dist];[ref][dist]libvmaf=log_fmt=json:log_path='{escaped_log}'"
         
@@ -278,7 +281,8 @@ def run_vmaf_search(
     target_vmaf: float,
     crf_range: Tuple[int, int],
     duration: float,
-    use_mpdecimate: bool
+    use_mpdecimate: bool,
+    duplicate_threshold: float = 0.001
 ) -> int:
     """
     Performs Binary Search optimization to find the CRF that yields target VMAF.
@@ -335,7 +339,8 @@ def run_vmaf_search(
                     dist_path=temp_out,
                     start_time=ts,
                     duration=segment_duration,
-                    use_mpdecimate=use_mpdecimate
+                    use_mpdecimate=use_mpdecimate,
+                    duplicate_threshold=duplicate_threshold
                 )
                 scores.append(score)
             except Exception as e:
@@ -414,7 +419,8 @@ def transcode_video(job_id: int):
     # Prepare video filters
     vf_filters = []
     if dedup:
-        vf_filters.append("mpdecimate")
+        threshold = opt_cfg.get("duplicate_threshold", 0.001)
+        vf_filters.append(f"mpdecimate=max=0:hi=64:lo=64:frac={threshold}")
         
     # Check subtitle burn-in
     sub_mode = sub_cfg.get("mode", "none")
@@ -454,7 +460,8 @@ def transcode_video(job_id: int):
             target_vmaf=target_vmaf,
             crf_range=tuple(crf_range),
             duration=duration,
-            use_mpdecimate=dedup
+            use_mpdecimate=dedup,
+            duplicate_threshold=opt_cfg.get("duplicate_threshold", 0.001)
         )
         update_job(job_id, selected_crf=crf)
     else:
@@ -486,7 +493,8 @@ def transcode_video(job_id: int):
         # If it's image-based subtitle (pgs, dvdsub)
         if "pgs" in t_codec or "dvd" in t_codec or "vob" in t_codec:
             # Complex filter overlay
-            decimate_node = "[0:v]mpdecimate[dec];" if dedup else ""
+            threshold = opt_cfg.get("duplicate_threshold", 0.001)
+            decimate_node = f"[0:v]mpdecimate=max=0:hi=64:lo=64:frac={threshold}[dec];" if dedup else ""
             v_input = "[dec]" if dedup else "[0:v]"
             filter_complex = f"{decimate_node}{v_input}[0:s:{t_track_id}]overlay[v]"
             cmd += ["-filter_complex", filter_complex, "-map", "[v]"]
@@ -669,7 +677,8 @@ def transcode_video(job_id: int):
                         dist_path=output_path,
                         start_time=vmaf_sample_start,
                         duration=vmaf_sample_len,
-                        use_mpdecimate=dedup
+                        use_mpdecimate=dedup,
+                        duplicate_threshold=opt_cfg.get("duplicate_threshold", 0.001)
                     )
                     logger.info(f"Final measured VMAF: {measured_vmaf}")
                 except Exception as ex:

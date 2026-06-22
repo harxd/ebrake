@@ -299,15 +299,16 @@ The "Tools" tab provides standalone utility calculators. These do not create dat
 #### 1. FPS Deduplication Dry-Run
 - **Objective**: Determine the number of duplicate frames and the resulting unduplicated frame rate without running a transcode.
 - **Backend Operation**:
-  - To optimize execution times on full-length movies, a duration threshold of **180 seconds (3 minutes)** is used:
-    - **Short Videos (<= 180s)**: A full scan is executed to guarantee 100% accuracy.
-    - **Long Videos (> 180s)**: High-speed temporal sampling is performed. The video is split into **10 evenly spaced 10-second segments** inside the middle 70% of the video (from 15% to 85% of total duration to avoid intro/outro credits).
+  - To optimize execution times on full-length movies while avoiding false positive detections, a duration threshold of **180 seconds (3 minutes)** is used:
+    - **Short Videos (<= 180s)**: A full scan is executed using strict, conservative `mpdecimate` settings to guarantee 100% precision.
+    - **Long Videos (> 180s)**: High-speed robust temporal sampling is performed. The video is split into **15 evenly spaced 15-second segments** inside the middle 70% of the video (from 15% to 85% of total duration to avoid intro/outro credits).
   - High-speed seeks (using input seek `-ss` before `-i`) are executed for each sample segment:
     ```bash
-    ffmpeg -y -ss [start_time] -t 10.0 -i [input_path] -vf mpdecimate -f null -
+    ffmpeg -y -ss [start_time] -t 15.0 -i [input_path] -vf mpdecimate=max=0:hi=64:lo=64:frac=0.001 -f null -
     ```
-  - Parse the standard error output of FFmpeg to read the unique output frames (`frame=...`) and accumulate them across all segments.
-  - The duplicate ratio is calculated from the samples and mathematically extrapolated to the total frame count (derived from probed metadata or estimated by `duration * source_fps`), completely eliding slow full-file packet copy counting passes.
+    - **Strict Filtering**: By passing `max=0:hi=64:lo=64:frac=0.001`, we restrict frame drops to almost completely identical frames (less than `0.1%` block changes). This avoids dropping low-motion content (talking heads, slow pans) which defaults (`frac=0.33`) would aggressively drop.
+  - **Outlier Rejection (Trimmed Mean)**: The duplicate ratios for all 15 segments are collected, sorted, and the top **3** (e.g. black transition frames, static scenes) and bottom **3** (e.g. action scenes) segments are discarded. The remaining 9 segments are averaged to calculate the final duplicate ratio.
+  - The duplicate ratio is mathematically extrapolated to the total frame count, completely eliding slow full-file packet copy counting passes.
   - Return:
     - Total Source Frames
     - Total Unique Frames
