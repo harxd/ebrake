@@ -141,38 +141,74 @@ def run_dedup_dryrun(file_path: Path) -> Dict[str, Any]:
     """
     Runs FPS Deduplication Dry-Run.
     Calculates duplicate frame metrics without writing a permanent output file.
+    Uses temporal sampling for longer videos to optimize performance.
     """
     metadata = probe_video(file_path)
     duration = metadata["duration"]
     source_fps = metadata["fps"]
-    
-    # Determine exact total frames by counting packets
-    cmd_count = [
-        "ffmpeg", "-y", "-i", str(file_path),
-        "-map", "0:v:0", "-c:v", "copy", "-f", "null", "-"
-    ]
-    p_count = subprocess.run(cmd_count, capture_output=True, text=True)
-    
-    # Find frame count in output
-    # E.g. frame=  250 fps=0.0 ...
-    frame_matches = re.findall(r"frame=\s*(\d+)", p_count.stderr)
-    total_frames = int(frame_matches[-1]) if frame_matches else metadata["nb_frames"]
+    total_frames = metadata["nb_frames"]
     
     if total_frames <= 0 and duration > 0 and source_fps > 0:
         total_frames = int(duration * source_fps)
 
-    # Run decimate dry-run
-    cmd_dedup = [
-        "ffmpeg", "-y", "-i", str(file_path),
-        "-vf", "mpdecimate", "-f", "null", "-"
-    ]
-    p_dedup = subprocess.run(cmd_dedup, capture_output=True, text=True)
-    
-    # Unique frames count
-    unique_matches = re.findall(r"frame=\s*(\d+)", p_dedup.stderr)
-    unique_frames = int(unique_matches[-1]) if unique_matches else total_frames
-    
-    dropped_frames = total_frames - unique_frames
+    # Threshold for full scan: 180 seconds (3 minutes)
+    if duration <= 180.0:
+        # Run full scan
+        cmd_dedup = [
+            "ffmpeg", "-y", "-i", str(file_path),
+            "-vf", "mpdecimate", "-f", "null", "-"
+        ]
+        p_dedup = subprocess.run(cmd_dedup, capture_output=True, text=True)
+        
+        # Unique frames count
+        unique_matches = re.findall(r"frame=\s*(\d+)", p_dedup.stderr)
+        unique_frames = int(unique_matches[-1]) if unique_matches else total_frames
+        dropped_frames = total_frames - unique_frames
+    else:
+        # Run sampled scan
+        num_segments = 10
+        segment_duration = 10.0
+        
+        # Distribute segments evenly in the middle 70% of the video
+        start_min = duration * 0.15
+        start_max = max(start_min, duration * 0.85 - segment_duration)
+        
+        total_sample_expected = 0
+        total_sample_unique = 0
+        
+        for i in range(num_segments):
+            if num_segments > 1:
+                start_time = start_min + (start_max - start_min) * i / (num_segments - 1)
+            else:
+                start_time = (start_min + start_max) / 2.0
+                
+            cmd_segment = [
+                "ffmpeg", "-y",
+                "-ss", f"{start_time:.3f}",
+                "-t", f"{segment_duration:.3f}",
+                "-i", str(file_path),
+                "-vf", "mpdecimate",
+                "-f", "null", "-"
+            ]
+            
+            p_segment = subprocess.run(cmd_segment, capture_output=True, text=True)
+            unique_matches = re.findall(r"frame=\s*(\d+)", p_segment.stderr)
+            
+            segment_expected = int(segment_duration * source_fps)
+            segment_unique = int(unique_matches[-1]) if unique_matches else segment_expected
+            
+            total_sample_expected += segment_expected
+            total_sample_unique += min(segment_unique, segment_expected)
+            
+        # Calculate duplicate ratio from samples
+        if total_sample_expected > 0:
+            dup_ratio = (total_sample_expected - total_sample_unique) / total_sample_expected
+        else:
+            dup_ratio = 0.0
+            
+        dropped_frames = int(dup_ratio * total_frames)
+        unique_frames = total_frames - dropped_frames
+        
     unduplicated_fps = unique_frames / duration if duration > 0 else source_fps
     saved_space_pct = (dropped_frames / total_frames * 100) if total_frames > 0 else 0.0
     

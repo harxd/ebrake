@@ -299,11 +299,15 @@ The "Tools" tab provides standalone utility calculators. These do not create dat
 #### 1. FPS Deduplication Dry-Run
 - **Objective**: Determine the number of duplicate frames and the resulting unduplicated frame rate without running a transcode.
 - **Backend Operation**:
-  - Run FFmpeg with the input file, applying the decimate filter and piping the output to `null`:
+  - To optimize execution times on full-length movies, a duration threshold of **180 seconds (3 minutes)** is used:
+    - **Short Videos (<= 180s)**: A full scan is executed to guarantee 100% accuracy.
+    - **Long Videos (> 180s)**: High-speed temporal sampling is performed. The video is split into **10 evenly spaced 10-second segments** inside the middle 70% of the video (from 15% to 85% of total duration to avoid intro/outro credits).
+  - High-speed seeks (using input seek `-ss` before `-i`) are executed for each sample segment:
     ```bash
-    ffmpeg -i [input_path] -vf mpdecimate -f null -
+    ffmpeg -y -ss [start_time] -t 10.0 -i [input_path] -vf mpdecimate -f null -
     ```
-  - Parse the standard error output of FFmpeg to count dropped frames (e.g. searching for `Parsed_mpdecimate_*` logs or comparing frame counts).
+  - Parse the standard error output of FFmpeg to read the unique output frames (`frame=...`) and accumulate them across all segments.
+  - The duplicate ratio is calculated from the samples and mathematically extrapolated to the total frame count (derived from probed metadata or estimated by `duration * source_fps`), completely eliding slow full-file packet copy counting passes.
   - Return:
     - Total Source Frames
     - Total Unique Frames
