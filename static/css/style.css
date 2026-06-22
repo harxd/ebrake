@@ -20,7 +20,7 @@
     --font-body: 'Inter', sans-serif;
     
     --sidebar-width: 240px;
-    --footer-height: 50px;
+    --footer-height: 0px;
     --radius-lg: 8px;               /* Clean crisp corners */
     --radius-md: 6px;
     --shadow-glow: none;            /* No box glows or visual noise */
@@ -184,7 +184,7 @@ a {
     flex-grow: 1;
     margin-left: var(--sidebar-width);
     padding: 32px;
-    padding-bottom: calc(var(--footer-height) + 40px); /* Avoid overlapping with footer */
+    padding-bottom: 120px; /* Leave scroll space at bottom for fixed action footers */
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -1245,28 +1245,22 @@ select.form-control option {
     margin-bottom: 8px;
 }
 
-/* Persistent footer status bar anchor */
-.status-footer {
-    height: var(--footer-height);
-    background: var(--bg-base);
+/* Persistent Status Panel in Sidebar */
+.sidebar-status-panel {
+    margin-top: auto;
+    padding-top: 20px;
     border-top: 1px solid var(--border-color);
-    position: fixed;
-    bottom: 0;
-    left: var(--sidebar-width);
-    right: 0;
-    z-index: 99;
-    padding: 0 32px;
+    width: 100%;
 }
 
-.footer-inner {
+.status-inner {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    height: 100%;
+    flex-direction: column;
+    gap: 6px;
     font-size: 13px;
 }
 
-.footer-title {
+.status-title {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1274,7 +1268,7 @@ select.form-control option {
     font-weight: 500;
 }
 
-.footer-status {
+.status-value {
     font-weight: 600;
 }
 
@@ -1392,6 +1386,26 @@ select.form-control option {
     padding-bottom: 8px;
 }
 
+/* Page-level fixed action footer for forms */
+.action-footer {
+    position: fixed;
+    bottom: 0;
+    left: var(--sidebar-width);
+    right: 0;
+    height: 72px;
+    background: var(--bg-base);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0 32px;
+    z-index: 98;
+}
+
+.action-footer .btn {
+    width: auto;
+}
+
 /* Responsive viewports mappings (< 768px) */
 @media (max-width: 767.98px) {
     :root {
@@ -1485,12 +1499,29 @@ select.form-control option {
         gap: 20px;
     }
     
-    .status-footer {
-        left: 0;
+    .sidebar-status-panel {
+        position: fixed;
         bottom: 64px; /* Docked right above the bottom nav */
-        padding: 0 16px;
+        left: 0;
+        right: 0;
         height: 44px;
         background: var(--bg-base);
+        border-top: 1px solid var(--border-color);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0 16px;
+        display: flex;
+        align-items: center;
+        margin-top: 0;
+        width: auto;
+        z-index: 99;
+    }
+    
+    .sidebar-status-panel .status-inner {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        gap: 12px;
     }
     
     .progress-details {
@@ -1500,5 +1531,20 @@ select.form-control option {
     
     .btn-large {
         padding: 12px 20px;
+    }
+    
+    .action-footer {
+        position: fixed;
+        left: 0;
+        bottom: 64px; /* Docked right above the bottom nav */
+        right: 0;
+        height: 64px;
+        background: var(--bg-base);
+        border-top: 1px solid var(--border-color);
+        padding: 0 16px;
+        z-index: 98;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
     }
 }

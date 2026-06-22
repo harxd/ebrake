@@ -8,11 +8,15 @@ The application layout dynamically adapts to screen sizes to ensure full usabili
 - **Desktop Viewport (>= 768px)**:
   - Sidebar layout: Navbar on the left containing "Create Job", "Jobs", "Profiles", "Tools", and "Settings" anchored at the bottom.
   - Sidebar remains fixed while the main content area scrolls.
-  - Current transcode status is displayed in a persistent footer at the bottom of the content area.
+  - Current transcode status is displayed in a persistent status block at the bottom of the sidebar/navbar navigation panel.
 - **Mobile Viewport (< 768px)**:
   - Bottom navigation bar: Sidebar collapses to a bottom-docked navigation bar for ergonomic thumb reach, or a top header with hamburger menu.
   - Two-column layouts stack vertically to fit narrow viewports.
   - Interactive element touch targets are increased to a minimum of 48px.
+- **Page-Wide Action Footers**:
+  - Submission and scan execution action buttons ("Add to Transcode Queue", "Save Profile Preset", and "Run Deduplication Scan" / "Run VMAF Quality Scan") are positioned within a page-wide fixed bottom footer element (`.action-footer`) outside the main scrollable columns layout.
+  - On the **Tools** page, the scan action button displayed changes dynamically depending on the active tab (FPS Deduplication or VMAF Quality Simulator) using the global tools Alpine.js store.
+  - This avoids containing-block limitations of glass panel cards, ensuring the footer is permanently visible at the bottom of the viewport on both desktop (docked next to the sidebar) and mobile (docked above the bottom navigation bar).
 
 ### Individual Pages
 - **Create Job**: 

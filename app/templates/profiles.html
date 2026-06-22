@@ -22,6 +22,15 @@
     
 </div>
 
+{% if request.headers.get("HX-Request") == "true" %}
+<!-- Page Action Footer OOB Swap -->
+<footer class="action-footer" id="page-action-footer" hx-swap-oob="true">
+    <button type="submit" form="profile-config-form" class="btn btn-primary btn-large" id="profile-save-btn" disabled>
+        <i class="fa-solid fa-save"></i> Save Profile Preset
+    </button>
+</footer>
+{% endif %}
+
 <script>
     function createNewPresetForm(category) {
         htmx.ajax('GET', `/api/profiles/config-fields?category=${encodeURIComponent(category)}`, {

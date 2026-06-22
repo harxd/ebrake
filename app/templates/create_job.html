@@ -5,7 +5,7 @@
     
     <!-- Right Column: Preset Configuration form -->
     <div class="panel card glass">
-        <form hx-post="/api/jobs" hx-swap="none" class="job-creation-form">
+        <form id="job-creation-form" hx-post="/api/jobs" hx-swap="none" class="job-creation-form">
             
             <!-- Hidden input holding selected file absolute path -->
             <input type="hidden" name="input_path" id="input_path_field" required>
@@ -36,30 +36,21 @@
                 </div>
             </div>
             
-            <!-- Submit and Priority Row -->
-            <div class="profile-selection-row" style="margin-top: 12px; margin-bottom: 24px;">
-                <div class="form-group">
-                    <label>Job Priority (Higher executes first)</label>
-                    <select name="priority" class="form-control">
-                        <option value="0">0</option>
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                        <option value="4">4</option>
-                        <option value="5">5</option>
-                        <option value="6">6</option>
-                        <option value="7">7</option>
-                        <option value="8">8</option>
-                        <option value="9">9</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>&nbsp;</label>
-                    <button type="submit" class="btn btn-primary btn-large" style="width: 100%; height: 44px; min-height: 44px;">
-                        <i class="fa-solid fa-circle-play"></i> Add to Transcode Queue
-                    </button>
-                </div>
+            <!-- Job Priority -->
+            <div class="form-group" style="margin-top: 12px; margin-bottom: 24px; max-width: 300px;">
+                <label>Job Priority (Higher executes first)</label>
+                <select name="priority" class="form-control">
+                    <option value="0">0</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                </select>
             </div>
             
             <!-- Preset Overrides Title and container -->
@@ -77,6 +68,15 @@
     </div>
     
 </div>
+
+{% if request.headers.get("HX-Request") == "true" %}
+<!-- Page Action Footer OOB Swap -->
+<footer class="action-footer" id="page-action-footer" hx-swap-oob="true">
+    <button type="submit" form="job-creation-form" class="btn btn-primary btn-large">
+        <i class="fa-solid fa-circle-play"></i> Add to Transcode Queue
+    </button>
+</footer>
+{% endif %}
 
 <script>
     function loadPresetFields() {

@@ -1,4 +1,4 @@
-<form hx-post="/api/profiles/save" hx-target="#profile-save-status">
+<form id="profile-config-form" hx-post="/api/profiles/save" hx-target="#profile-save-status">
     
     <div class="panel-header-row">
         <h3 class="panel-title">
@@ -26,10 +26,13 @@
     
     {% include "components/profile_overrides.html" %}
     
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary btn-large">
-            <i class="fa-solid fa-save"></i> Save Profile Preset
-        </button>
-    </div>
-    
 </form>
+
+{% if request.headers.get("HX-Request") == "true" %}
+<!-- Swap enabled save button into the permanent page footer -->
+<footer class="action-footer" id="page-action-footer" hx-swap-oob="true">
+    <button type="submit" form="profile-config-form" class="btn btn-primary btn-large" id="profile-save-btn">
+        <i class="fa-solid fa-save"></i> Save Profile Preset
+    </button>
+</footer>
+{% endif %}

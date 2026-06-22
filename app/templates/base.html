@@ -37,6 +37,9 @@
                     sessionStorage.setItem('privacy_snoozed', this.snoozed ? 'true' : 'false');
                 }
             });
+            Alpine.store('tools', {
+                active: 'dedup'
+            });
         });
     </script>
     <script src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js" defer></script>
@@ -127,6 +130,24 @@
                     <span class="toggle-label" x-text="$store.privacy.snoozed ? 'Show Titles' : 'Blur Titles'"></span>
                 </button>
             </div>
+            
+            <!-- Persistent Transcode Status in Sidebar -->
+            <div class="sidebar-status-panel" 
+                 hx-get="/api/jobs/poll-queues" 
+                 hx-trigger="every 3s" 
+                 hx-target="#queues-container"
+                 hx-swap="innerHTML">
+                <div class="status-inner">
+                    <div class="status-title">
+                        <i class="fa-solid fa-circle" id="status-engine-dot" style="color: {% if queue_paused %}var(--color-danger){% else %}var(--color-success){% endif %}; font-size: 8px;"></i>
+                        <span>Status Engine</span>
+                    </div>
+                    <div class="status-value" id="footer-status-indicator">
+                        <!-- Filled dynamically when queues update -->
+                        <span>Ready to Transcode</span>
+                    </div>
+                </div>
+            </div>
         </nav>
         
         <!-- Main Content Area -->
@@ -137,22 +158,24 @@
                 {% endif %}
             </div>
             
-            <!-- Persistent Transcode Status Footer -->
-            <footer class="status-footer" 
-                    hx-get="/api/jobs/poll-queues" 
-                    hx-trigger="every 3s" 
-                    hx-target="#queues-container"
-                    hx-swap="innerHTML">
-                <div class="footer-inner">
-                    <div class="footer-title">
-                        <i class="fa-solid fa-circle-notch fa-spin"></i>
-                        <span>Status Engine: Active</span>
-                    </div>
-                    <div class="footer-status" id="footer-status-indicator">
-                        <!-- Filled dynamically when queues update -->
-                        <span>Ready to Transcode</span>
-                    </div>
-                </div>
+            <!-- Page-wide Action Footer -->
+            <footer class="action-footer" id="page-action-footer" {% if not page_template in ['create_job.html', 'profiles.html', 'tools.html'] or (page_template == 'profiles.html' and not preset_name) %}style="display: none;"{% endif %}>
+                {% if page_template == 'create_job.html' %}
+                    <button type="submit" form="job-creation-form" class="btn btn-primary btn-large">
+                        <i class="fa-solid fa-circle-play"></i> Add to Transcode Queue
+                    </button>
+                {% elif page_template == 'profiles.html' %}
+                    <button type="submit" form="profile-config-form" class="btn btn-primary btn-large" id="profile-save-btn" {% if not preset_name %}disabled{% endif %}>
+                        <i class="fa-solid fa-save"></i> Save Profile Preset
+                    </button>
+                {% elif page_template == 'tools.html' %}
+                    <button type="submit" form="dedup-form" class="btn btn-primary btn-large" x-show="$store.tools.active === 'dedup'">
+                        <i class="fa-solid fa-square-poll-vertical"></i> Run Deduplication Scan
+                    </button>
+                    <button type="submit" form="vmaf-form" class="btn btn-primary btn-large" onclick="syncVmafFilePath()" x-show="$store.tools.active === 'vmaf'" style="display: none;">
+                        <i class="fa-solid fa-play"></i> Run VMAF Quality Scan
+                    </button>
+                {% endif %}
             </footer>
         </main>
         

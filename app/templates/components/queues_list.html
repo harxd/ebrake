@@ -26,7 +26,7 @@
         
         <!-- Active Job Card -->
         <div class="panel card glass">
-            <h3 class="panel-title"><i class="fa-solid fa-gear fa-spin"></i> Active Transcodes</h3>
+            <h3 class="panel-title"><i class="fa-solid fa-gear"></i> Active Transcodes</h3>
             
             {% for job in running %}
                 <div class="running-job-card">
@@ -234,3 +234,6 @@
         </span>
     {% endif %}
 </div>
+
+<!-- Out-Of-Band (OOB) Status Engine Dot swap -->
+<i id="status-engine-dot" class="fa-solid fa-circle" style="color: {% if queue_paused %}var(--color-danger){% else %}var(--color-success){% endif %}; font-size: 8px;" hx-swap-oob="true"></i>
