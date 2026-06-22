@@ -60,8 +60,10 @@ To run the application locally on your host machine:
    python -m venv .venv
    # On Windows:
    .venv\Scripts\activate
-   # On Linux/macOS:
+   # On Linux/macOS (bash/zsh):
    source .venv/bin/activate
+   # On Linux/macOS (fish):
+   source .venv/bin/activate.fish
    
    pip install -r requirements.txt
    ```
