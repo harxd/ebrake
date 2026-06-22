@@ -1,5 +1,24 @@
 <div class="override-grid">
     
+    <!-- Container & Output Section -->
+    <div class="panel-section">
+        <h4 class="section-title"><i class="fa-solid fa-box-open"></i> Container & Output</h4>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Output Filename Suffix</label>
+                <input type="text" name="output_suffix" class="form-control" value="{{ profile.output.output_suffix }}" placeholder="e.g. _transcoded">
+            </div>
+            
+            <div class="form-group">
+                <label>Container Format</label>
+                <select name="container" class="form-control">
+                    <option value="mkv" {% if profile.output.container == 'mkv' %}selected{% endif %}>MKV (Matroska)</option>
+                    <option value="mp4" {% if profile.output.container == 'mp4' %}selected{% endif %}>MP4 (MPEG-4)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
     <!-- Video Configurations Section -->
     <div class="panel-section">
         <h4 class="section-title"><i class="fa-solid fa-video"></i> Video Encoding</h4>
@@ -59,37 +78,6 @@
         </div>
     </div>
     
-    <!-- Optimizations & Filters Section -->
-    <div class="panel-section">
-        <h4 class="section-title"><i class="fa-solid fa-bolt"></i> Optimization & Filters</h4>
-        
-        <div class="form-group">
-            <label>Target VMAF (Auto-CRF Selection)</label>
-            <input type="number" step="0.1" name="target_vmaf" class="form-control" value="{{ profile.optimization.target_vmaf }}" placeholder="e.g. 95.0 (0 to disable)">
-            <span class="input-tip">Searches CRF range automatically to match quality.</span>
-        </div>
-        
-        <div class="form-row">
-            <div class="form-group">
-                <label>VMAF Min CRF</label>
-                <input type="number" name="vmaf_min" class="form-control" value="{{ profile.optimization.vmaf_search_range[0] | default(18) }}">
-            </div>
-            
-            <div class="form-group">
-                <label>VMAF Max CRF</label>
-                <input type="number" name="vmaf_max" class="form-control" value="{{ profile.optimization.vmaf_search_range[1] | default(30) }}">
-            </div>
-        </div>
-        
-        <div class="form-group checkbox-group">
-            <label class="checkbox-container">
-                <input type="checkbox" name="dedup" value="true" {% if profile.optimization.duplicate_frame_detection %}checked{% endif %}>
-                <span class="checkmark"></span>
-                <span>Enable FPS Deduplication (Drop identical frames)</span>
-            </label>
-        </div>
-    </div>
-    
     <!-- Audio Configurations Section -->
     <div class="panel-section">
         <h4 class="section-title"><i class="fa-solid fa-volume-high"></i> Audio Encoding</h4>
@@ -132,9 +120,9 @@
         </div>
     </div>
     
-    <!-- Subtitles & Output Container Section -->
+    <!-- Subtitles Section -->
     <div class="panel-section">
-        <h4 class="section-title"><i class="fa-solid fa-closed-captioning"></i> Subtitles & Container</h4>
+        <h4 class="section-title"><i class="fa-solid fa-closed-captioning"></i> Subtitles</h4>
         
         <div class="form-group">
             <label>Subtitle Mode</label>
@@ -155,20 +143,36 @@
                 <option value="2">Track Index 2</option>
             </select>
         </div>
+    </div>
+
+    <!-- Extras & Optimizations Section -->
+    <div class="panel-section">
+        <h4 class="section-title"><i class="fa-solid fa-bolt"></i> Extras & Optimizations</h4>
+        
+        <div class="form-group">
+            <label>Target VMAF (Auto-CRF Selection)</label>
+            <input type="number" step="0.1" name="target_vmaf" class="form-control" value="{{ profile.optimization.target_vmaf }}" placeholder="e.g. 95.0 (0 to disable)">
+            <span class="input-tip">Searches CRF range automatically to match quality.</span>
+        </div>
         
         <div class="form-row">
             <div class="form-group">
-                <label>Output Filename Suffix</label>
-                <input type="text" name="output_suffix" class="form-control" value="{{ profile.output.output_suffix }}" placeholder="e.g. _transcoded">
+                <label>VMAF Min CRF</label>
+                <input type="number" name="vmaf_min" class="form-control" value="{{ profile.optimization.vmaf_search_range[0] | default(18) }}">
             </div>
             
             <div class="form-group">
-                <label>Container Format</label>
-                <select name="container" class="form-control">
-                    <option value="mkv" {% if profile.output.container == 'mkv' %}selected{% endif %}>MKV (Matroska)</option>
-                    <option value="mp4" {% if profile.output.container == 'mp4' %}selected{% endif %}>MP4 (MPEG-4)</option>
-                </select>
+                <label>VMAF Max CRF</label>
+                <input type="number" name="vmaf_max" class="form-control" value="{{ profile.optimization.vmaf_search_range[1] | default(30) }}">
             </div>
+        </div>
+        
+        <div class="form-group checkbox-group">
+            <label class="checkbox-container">
+                <input type="checkbox" name="dedup" value="true" {% if profile.optimization.duplicate_frame_detection %}checked{% endif %}>
+                <span class="checkmark"></span>
+                <span>Enable FPS Deduplication (Drop identical frames)</span>
+            </label>
         </div>
     </div>
     

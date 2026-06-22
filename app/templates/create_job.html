@@ -1,48 +1,11 @@
 <div class="two-column-layout">
     
     <!-- Left Column: File Browser cache -->
-    <div class="panel card glass">
-        <div class="panel-header-row">
-            <h3 class="panel-title"><i class="fa-solid fa-folder-open"></i> Media Library</h3>
-            <div class="browser-controls">
-                <button class="btn btn-icon" 
-                        hx-post="/api/media/sync" 
-                        hx-swap="outerHTML" 
-                        title="Rescan media directory">
-                    <i class="fa-solid fa-rotate"></i>
-                    <span>Update search db</span>
-                </button>
-            </div>
-        </div>
-        
-        <!-- Search bar with HTMX delayed trigger -->
-        <div class="search-box-wrapper">
-            <i class="fa-solid fa-magnifying-glass search-icon"></i>
-            <input type="text" name="q" 
-                   placeholder="Search files by name..." 
-                   class="search-input"
-                   hx-get="/api/media/search" 
-                   hx-trigger="keyup changed delay:300ms" 
-                   hx-target="#file-list"
-                   hx-indicator="#search-loading">
-            <span id="search-loading" class="htmx-indicator loader-inline"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
-        </div>
-        
-        <div class="file-browser-container" id="file-list" hx-get="/api/media/search" hx-trigger="load">
-            <div class="loading-state">
-                <i class="fa-solid fa-circle-notch fa-spin"></i>
-                <p>Loading files index...</p>
-            </div>
-        </div>
-    </div>
+    {% include "components/file_browser.html" %}
     
     <!-- Right Column: Preset Configuration form -->
     <div class="panel card glass">
         <form hx-post="/api/jobs" hx-swap="none" class="job-creation-form">
-            
-            <div class="panel-header-row">
-                <h3 class="panel-title"><i class="fa-solid fa-sliders"></i> Configure Encoding</h3>
-            </div>
             
             <!-- Hidden input holding selected file absolute path -->
             <input type="hidden" name="input_path" id="input_path_field" required>
@@ -73,8 +36,34 @@
                 </div>
             </div>
             
-            <!-- Preset Overrides Title and container (moved directly under selections) -->
-            <div class="panel-header-row" style="margin-top: 6px;">
+            <!-- Submit and Priority Row -->
+            <div class="profile-selection-row" style="margin-top: 12px; margin-bottom: 24px;">
+                <div class="form-group">
+                    <label>Job Priority (Higher executes first)</label>
+                    <select name="priority" class="form-control">
+                        <option value="0">0</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button type="submit" class="btn btn-primary btn-large" style="width: 100%; height: 44px; min-height: 44px;">
+                        <i class="fa-solid fa-circle-play"></i> Add to Transcode Queue
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Preset Overrides Title and container -->
+            <div class="panel-header-row" style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 20px;">
                 <h4 class="panel-title" style="font-size: 15px;"><i class="fa-solid fa-sliders"></i> Preset Overrides</h4>
             </div>
             
@@ -82,26 +71,6 @@
                 {% if profile %}
                     {% include "components/profile_overrides.html" %}
                 {% endif %}
-            </div>
-            
-            <hr class="divider">
-            
-            <!-- Job Priority -->
-            <div class="form-group">
-                <label>Job Priority (Higher executes first)</label>
-                <select name="priority" class="form-control">
-                    <option value="0">Normal Priority (0)</option>
-                    <option value="1">Medium Priority (1)</option>
-                    <option value="5">High Priority (5)</option>
-                    <option value="10">Urgent Priority (10)</option>
-                </select>
-            </div>
-            
-            <!-- Submit Button -->
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary btn-large">
-                    <i class="fa-solid fa-circle-play"></i> Add to Transcode Queue
-                </button>
             </div>
             
         </form>

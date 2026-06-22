@@ -175,7 +175,13 @@ To provide a robust, host-system-agnostic, and fast search feature in Docker tha
            hx-target="#file-list"
            hx-indicator="#search-indicator" />
     ```
-- **Sync Control**: A small "Sync" button next to the search input. Clicking it makes a `POST` request to `/api/media/sync`, triggering the scanner in the background and showing a progress spinner.
+- **Sync Control & Human Machine Interaction (HMI)**:
+  - A sync button ("Update search db") is located in the header of the modular file browser.
+  - **HMI Flow**:
+    1. **Idle State**: The button displays a rotation icon with the label "Update search db".
+    2. **Syncing State**: Clicking the button makes a `POST` request to `/api/media/sync`, triggering the directory scanner in a background task. The button transitions to a disabled "Updating" state with a spinning loader indicator to provide active feedback.
+    3. **Success State**: The frontend polls `/api/media/sync/status` every second. Once the scanner finishes, the button turns emerald green (`var(--color-success)`) displaying "Sync successful" with a checkmark icon to provide a clear completion signal.
+    4. **Reset State**: After exactly 2 seconds, the success button automatically triggers a GET request to `/api/media/sync/reset` to restore the button back to its initial idle state, ensuring the interface is ready for subsequent updates and uncluttered.
 
 ### Job Configuration Override & Serialization Design
 
@@ -657,7 +663,9 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
 | Method | Endpoint | Request Payload | Return Type | Description |
 |--------|----------|-----------------|-------------|-------------|
 | **GET** | `/api/media/search` | Query params: `q: str` | HTML Snippet | Runs SQLite search on cached filenames. Returns filtered file browser rows. |
-| **POST** | `/api/media/sync` | None | HTML (toast/spinner) | Triggers the background directory walker (`os.scandir`) to refresh `media_files`. |
+| **POST** | `/api/media/sync` | None | HTML (spinner button) | Triggers the background directory walker (`os.scandir`) to refresh `media_files`. |
+| **GET** | `/api/media/sync/status` | None | HTML (status button) | Polls the scanner state. Returns a spinning "Updating" button if syncing; returns a green "Sync successful" button if finished. |
+| **GET** | `/api/media/sync/reset` | None | HTML (idle button) | Resets the button back to the standard idle "Update search db" button. |
 | **POST** | `/api/jobs` | JSON (Paths, presets, overrides) | HTML (queue row) | Validates preset parameters, generates ffmpeg template, writes to database. |
 | **POST** | `/api/jobs/reorder` | JSON: `{job_id, from_pos, to_pos}` | HTML (updated queue) | Reorders queue items within the "Transcode Next" list. |
 | **POST** | `/api/jobs/transcode-next` | JSON: `{job_id, target_pos}` | HTML (updated queue) | Inserts a job into "Transcode Next" at a specific index. |

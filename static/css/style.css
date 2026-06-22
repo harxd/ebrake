@@ -1362,6 +1362,36 @@ select.form-control option {
     font-size: 13px;
 }
 
+/* Profiles / Overrides Grid Layout */
+.override-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    margin-top: 16px;
+}
+
+.panel-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-heading);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+}
+
 /* Responsive viewports mappings (< 768px) */
 @media (max-width: 767.98px) {
     :root {
@@ -1440,7 +1470,7 @@ select.form-control option {
     }
     
     /* Stack components vertically on mobile */
-    .two-column-layout {
+    .two-column-layout, .override-grid {
         grid-template-columns: 1fr;
         gap: 20px;
     }

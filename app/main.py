@@ -260,13 +260,28 @@ async def api_media_sync_status(request: Request):
     else:
         return """
         <button class="btn btn-icon" 
-                hx-post="/api/media/sync" 
-                hx-swap="outerHTML" 
-                title="Rescan media directory">
-            <i class="fa-solid fa-rotate"></i>
-            <span>Update search db</span>
+                style="background-color: var(--color-success) !important; color: #ffffff !important; border-color: var(--color-success) !important;"
+                hx-get="/api/media/sync/reset" 
+                hx-trigger="load delay:2s" 
+                hx-swap="outerHTML"
+                title="Sync successful">
+            <i class="fa-solid fa-check"></i>
+            <span>Sync successful</span>
         </button>
         """
+
+@app.get("/api/media/sync/reset", response_class=HTMLResponse)
+async def api_media_sync_reset(request: Request):
+    """Reset the media sync button back to idle state."""
+    return """
+    <button class="btn btn-icon" 
+            hx-post="/api/media/sync" 
+            hx-swap="outerHTML" 
+            title="Rescan media directory">
+        <i class="fa-solid fa-rotate"></i>
+        <span>Update search db</span>
+    </button>
+    """
 
 # API ENDPOINTS - PROFILES MANAGEMENT
 

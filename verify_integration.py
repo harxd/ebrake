@@ -342,6 +342,24 @@ async def test_non_video_endpoints():
     assert "temp_input.mkv" in res_html, "Search API failed to return cached search hits!"
     print("[OK] Cached search DB queries and rendering verified.")
     
+    print("\nSimulating HTTP Media Sync endpoints...")
+    from app.main import api_media_sync, api_media_sync_status, api_media_sync_reset
+    from fastapi import BackgroundTasks
+    
+    # 1. Trigger sync
+    bg_tasks = BackgroundTasks()
+    res_sync = await api_media_sync(req, background_tasks=bg_tasks)
+    assert "Updating" in res_sync, "Sync initiation response HTML mismatch!"
+    
+    # 2. Check status (while syncing or finished)
+    res_status = await api_media_sync_status(req)
+    assert ("Updating" in res_status or "Sync successful" in res_status), "Sync status response HTML mismatch!"
+    
+    # 3. Reset sync button
+    res_reset = await api_media_sync_reset(req)
+    assert "Update search db" in res_reset, "Sync reset response HTML mismatch!"
+    print("[OK] Media sync, status polling, and reset endpoints verified.")
+    
     print("[SUCCESS] Phase 5 checks passed successfully.")
 
 def run_tests():

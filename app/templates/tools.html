@@ -1,40 +1,7 @@
 <div class="two-column-layout" x-data="{ activeTool: 'dedup' }">
     
     <!-- Left Column: File Browser selector -->
-    <div class="panel card glass">
-        <div class="panel-header-row">
-            <h3 class="panel-title"><i class="fa-solid fa-folder-open"></i> Select Source Video</h3>
-            <div class="browser-controls">
-                <button class="btn btn-icon" hx-post="/api/media/sync" hx-swap="outerHTML">
-                    <i class="fa-solid fa-rotate"></i>
-                    <span>Sync</span>
-                </button>
-            </div>
-        </div>
-        
-        <div class="selected-file-banner">
-            <div class="banner-icon"><i class="fa-solid fa-file-video"></i></div>
-            <div class="banner-text-details">
-                <span class="label-header">Source File</span>
-                <span class="file-name-display no-file" id="selected_file_label">Select a file in the browser below</span>
-            </div>
-        </div>
-        
-        <!-- Search input box -->
-        <div class="search-box-wrapper">
-            <i class="fa-solid fa-magnifying-glass search-icon"></i>
-            <input type="text" name="q" placeholder="Filter files..." class="search-input"
-                   hx-get="/api/media/search" hx-trigger="keyup changed delay:300ms" hx-target="#file-list" hx-indicator="#search-loading">
-            <span id="search-loading" class="htmx-indicator loader-inline"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
-        </div>
-        
-        <div class="file-browser-container" id="file-list" hx-get="/api/media/search" hx-trigger="load">
-            <div class="loading-state">
-                <i class="fa-solid fa-circle-notch fa-spin"></i>
-                <p>Loading files index...</p>
-            </div>
-        </div>
-    </div>
+    {% include "components/file_browser.html" %}
     
     <!-- Right Column: Dry-Run Workspaces -->
     <div class="panel card glass flex-column">
