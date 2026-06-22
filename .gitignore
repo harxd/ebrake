@@ -1,0 +1,24 @@
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local configuration and data storage
+appdata/
+media/
+*.db
+
+# Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Temp files
+*.log
+*.tmp
+temp/

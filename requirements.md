@@ -683,3 +683,45 @@ document.addEventListener('alpine:init', () => {
     });
 });
 ```
+
+---
+
+## Verification & Testing
+
+To ensure the application operates correctly, two automated verification suites are available:
+
+1. **Lightweight Sanity Check (`verify.py`)**: A fast, dependency-free backend sanity check to test database storage, directory creation, default profile parser parsing, and basic queue sequencing without spawning any subprocesses or transcoding videos.
+2. **Robust Integration Suite (`verify_integration.py`)**: A full end-to-end integration suite that programmatically generates synthetic media files with repeated frames and subtitle tracks, runs actual `ffmpeg` and `ffprobe` processes in a sandboxed environment, tests transcoding pipelines, and simulates web API requests.
+
+### verify.py Capabilities
+
+Currently, `verify.py` validates the following functionalities:
+
+- **Setup & Initialization (`test_setup`)**:
+  - **Directory Creation**: Verifies that `init_directories()` successfully creates required app folders.
+  - **Database Setup**: Verifies that `init_db()` creates the SQLite database at `DB_PATH`.
+  - **Settings CRUD**: Validates that system configuration read/write operations work by setting and getting a test key.
+  - **Profile Configuration**: Loads the profile manager via `init_profiles()` and ensures that the categories list includes the `"Default"` category, and that the `"AV1 VMAF Auto-CRF"` profile correctly parses the SVT-AV1 codec settings.
+- **Queue and 'Transcode Next' Scheduling (`test_queues`)**:
+  - **Priority Ordering**: Creates two pending jobs and verifies they are sorted in descending order of priority.
+  - **Transcode Next Insertion**: Promotes a lower-priority job to "Transcode Next" and asserts that it takes precedence at the front of the queue.
+  - **Atomic Worker Processing**: Tests `start_next_job()` to confirm that it updates the job status to `running` atomically, returns the correct job, and correctly handles queue gap-compaction.
+  - **Cleanup**: Verifies job deletion works as expected.
+- **Library Scanner (`test_scanner`)**:
+  - **Sync Run**: Runs `run_library_sync()` to ensure it successfully scans media folders without raising unexpected exceptions.
+
+### verify_integration.py Capabilities
+
+This script creates a sandboxed DB and app data space to execute complete integration tests:
+
+- **Asset Generation**: Automatically constructs a 5-second 25fps Matroska container (`temp_input.mkv`) with repeated video frames (duplicates) and soft subtitle tracks using local `ffmpeg`.
+- **E2E Transcoding Checks**:
+  - **H.264 Transcoding**: Converts MKV input to MP4 using H.264 video codec and asserts output existence.
+  - **Duplicate Frame Detection**: Runs SVT-AV1 transcode with `mpdecimate` filter active, and asserts that the measured `unduplicated_fps` is appropriately reduced compared to the source.
+  - **VMAF Auto-CRF Optimization**: Performs multi-pass binary search CRF optimization against target VMAF scores using `libvmaf` filter (automatically skipped if `libvmaf` is missing from the container's FFmpeg build).
+  - **Subtitle Burn-in**: Runs video burn-in transcode and verifies correct subtitle track matching and mapping using subtitle-specific track index offsets.
+- **Standalone Tools Dry-Runs**:
+  - Validates direct function calls to `run_dedup_dryrun()` and `run_vmaf_search()`.
+- **FastAPI Web API Route Simulation**:
+  - Mocks FastAPI Request objects to test `/api/settings` and `/api/media/search` endpoints and their HTMX templates rendering.
+- **Environment Cleanups**: Purges all intermediate assets and databases upon completion.

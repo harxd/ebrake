@@ -444,20 +444,20 @@ def transcode_video(job_id: int):
         
     # Subtitle burn-in vs filters complex assembly
     if burn_in_track:
-        t_index = burn_in_track["index"]
         t_codec = burn_in_track["codec"]
+        t_track_id = burn_in_track["track_id"]
         
         # If it's image-based subtitle (pgs, dvdsub)
         if "pgs" in t_codec or "dvd" in t_codec or "vob" in t_codec:
             # Complex filter overlay
             decimate_node = "[0:v]mpdecimate[dec];" if dedup else ""
             v_input = "[dec]" if dedup else "[0:v]"
-            filter_complex = f"{decimate_node}{v_input}[0:s:{t_index}]overlay[v]"
+            filter_complex = f"{decimate_node}{v_input}[0:s:{t_track_id}]overlay[v]"
             cmd += ["-filter_complex", filter_complex, "-map", "[v]"]
         else:
             # Text based: apply subtitle vf filter
             escaped_input = escape_filter_path(input_path)
-            vf_filters.append(f"subtitles='{escaped_input}':si={t_index}")
+            vf_filters.append(f"subtitles='{escaped_input}':si={t_track_id}")
             cmd += ["-vf", ",".join(vf_filters), "-map", "0:v:0"]
     else:
         if vf_filters:
