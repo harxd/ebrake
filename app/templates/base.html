@@ -93,7 +93,7 @@
                        @click="activeTab = '/profiles'"
                        :class="{'active': activeTab === '/profiles'}">
                         <i class="fa-solid fa-sliders"></i>
-                        <span>Profiles</span>
+                        <span>Presets</span>
                     </a>
                 </li>
                 <li>
@@ -152,31 +152,35 @@
         
         <!-- Main Content Area -->
         <main class="content-wrapper">
-            <div id="main-content" class="fade-in-up">
-                {% if page_template %}
-                    {% include page_template %}
-                {% endif %}
+            <div class="page-container">
+                <div class="page-content">
+                    <div id="main-content" class="fade-in-up">
+                        {% if page_template %}
+                            {% include page_template %}
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Page-wide Action Bar -->
+                <div class="action-bar" id="page-action-bar" {% if not page_template in ['create_job.html', 'profiles.html', 'tools.html'] or (page_template == 'profiles.html' and not preset_name) %}style="display: none;"{% endif %}>
+                    {% if page_template == 'create_job.html' %}
+                        <button type="submit" form="job-creation-form" class="btn btn-primary btn-large" id="job-submit-btn" disabled>
+                            <i class="fa-solid fa-circle-play"></i> Add to Transcode Queue
+                        </button>
+                    {% elif page_template == 'profiles.html' %}
+                        <button type="submit" form="profile-config-form" class="btn btn-primary btn-large" id="profile-save-btn" disabled>
+                            <i class="fa-solid fa-save"></i> Save Preset
+                        </button>
+                    {% elif page_template == 'tools.html' %}
+                        <button type="submit" form="dedup-form" class="btn btn-primary btn-large" id="tool-dedup-btn" x-show="$store.tools.active === 'dedup'" disabled>
+                            <i class="fa-solid fa-square-poll-vertical"></i> Run Deduplication Scan
+                        </button>
+                        <button type="submit" form="vmaf-form" class="btn btn-primary btn-large" id="tool-vmaf-btn" onclick="syncVmafFilePath()" x-show="$store.tools.active === 'vmaf'" style="display: none;" disabled>
+                            <i class="fa-solid fa-play"></i> Run VMAF Quality Scan
+                        </button>
+                    {% endif %}
+                </div>
             </div>
-            
-            <!-- Page-wide Action Footer -->
-            <footer class="action-footer" id="page-action-footer" {% if not page_template in ['create_job.html', 'profiles.html', 'tools.html'] or (page_template == 'profiles.html' and not preset_name) %}style="display: none;"{% endif %}>
-                {% if page_template == 'create_job.html' %}
-                    <button type="submit" form="job-creation-form" class="btn btn-primary btn-large">
-                        <i class="fa-solid fa-circle-play"></i> Add to Transcode Queue
-                    </button>
-                {% elif page_template == 'profiles.html' %}
-                    <button type="submit" form="profile-config-form" class="btn btn-primary btn-large" id="profile-save-btn" {% if not preset_name %}disabled{% endif %}>
-                        <i class="fa-solid fa-save"></i> Save Profile Preset
-                    </button>
-                {% elif page_template == 'tools.html' %}
-                    <button type="submit" form="dedup-form" class="btn btn-primary btn-large" x-show="$store.tools.active === 'dedup'">
-                        <i class="fa-solid fa-square-poll-vertical"></i> Run Deduplication Scan
-                    </button>
-                    <button type="submit" form="vmaf-form" class="btn btn-primary btn-large" onclick="syncVmafFilePath()" x-show="$store.tools.active === 'vmaf'" style="display: none;">
-                        <i class="fa-solid fa-play"></i> Run VMAF Quality Scan
-                    </button>
-                {% endif %}
-            </footer>
         </main>
         
     </div>

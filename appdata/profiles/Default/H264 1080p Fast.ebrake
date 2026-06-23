@@ -20,7 +20,7 @@ fallback_bitrate = 128000
 
 [subtitles]
 mode = "none"
-languages = [ "eng",]
+languages = [ "all",]
 burn_in_track_select = "default"
 
 [output]

@@ -6,31 +6,38 @@
 The application layout dynamically adapts to screen sizes to ensure full usability on both desktop and mobile devices.
 
 - **Desktop Viewport (>= 768px)**:
-  - Sidebar layout: Navbar on the left containing "Create Job", "Jobs", "Profiles", "Tools", and "Settings" anchored at the bottom.
+  - Sidebar layout: Navbar on the left containing "Create Job", "Jobs", "Presets", "Tools", and "Settings" anchored at the bottom.
   - Sidebar remains fixed while the main content area scrolls.
   - Current transcode status is displayed in a persistent status block at the bottom of the sidebar/navbar navigation panel.
 - **Mobile Viewport (< 768px)**:
   - Bottom navigation bar: Sidebar collapses to a bottom-docked navigation bar for ergonomic thumb reach, or a top header with hamburger menu.
   - Two-column layouts stack vertically to fit narrow viewports.
   - Interactive element touch targets are increased to a minimum of 48px.
-- **Page-Wide Action Footers**:
-  - Submission and scan execution action buttons ("Add to Transcode Queue", "Save Profile Preset", and "Run Deduplication Scan" / "Run VMAF Quality Scan") are positioned within a page-wide fixed bottom footer element (`.action-footer`) outside the main scrollable columns layout.
-  - On the **Tools** page, the scan action button displayed changes dynamically depending on the active tab (FPS Deduplication or VMAF Quality Simulator) using the global tools Alpine.js store.
-  - This avoids containing-block limitations of glass panel cards, ensuring the footer is permanently visible at the bottom of the viewport on both desktop (docked next to the sidebar) and mobile (docked above the bottom navigation bar).
+- **Page-Level Action Bars**:
+  - Subpages requiring primary submissions or scan execution controls feature exactly two sections: a scrollable content section (`.page-content`) and a bottom-docked action bar (`.action-bar`) containing its right-aligned primary button ("Add to Transcode Queue", "Save Preset", and "Run Deduplication Scan" / "Run VMAF Quality Scan").
+  - On the **Tools** page, the scan action button displayed within the action bar changes dynamically depending on the active tab (FPS Deduplication or VMAF Quality Simulator) using the global tools Alpine.js store.
+  - This design structures the view area using modern Flexbox, ensuring only the page content scrolls while the sidebar and action bar remain anchored. On mobile, the content viewport adjusts to sit cleanly above the bottom navigation and status panels.
+  - **Action Button Feedback & State**:
+    - Buttons that trigger save or configuration submit operations (such as saving presets or system settings) must be visually disabled (greyed out) by default if no modifications have been made by the user.
+    - As soon as the user makes any input change within the form, the button becomes active.
+    - Upon successful execution/save, instead of showing a separate success alert element or notification message in the UI, the save button itself must momentarily (1.5 seconds) turn success-green (`var(--color-success)`) and display a success status (e.g., `<i class="fa-solid fa-check"></i> Saved!`), then return to its standard disabled and greyed-out state.
+    - Buttons that require file selection before execution (such as "Add to Transcode Queue" on the Create Job page or "Run Deduplication Scan" and "Run VMAF Quality Scan" on the Tools page) must be visually disabled (greyed out) by default on initial page rendering. They must only become active once the user selects a video file from the file browser.
 
 ### Individual Pages
 - **Create Job**: 
-  - *Desktop*: Two columns: file browser on the left (featuring an interactive delayed-search input bar and a library sync control button), profile selection and override on the right.
-  - *Mobile*: Stacks vertically (file browser on top, profile selection below) or uses a tabbed interface.
+  - *Desktop*: Two columns split equally (50%/50% width): file browser on the left (featuring an interactive delayed-search input bar and a library sync control button), preset selection and override on the right.
+  - *Mobile*: Stacks vertically (file browser on top, preset selection below) or uses a tabbed interface.
 - **Jobs**: 
   - *Desktop*: Full table showing all job metadata columns.
   - *Mobile*: Collapses to cards or displays only core columns (status, progress bar, file name) to avoid horizontal scrolling.
-- **Profiles**: 
-  - *Desktop*: Two columns: profile categories tree on the left, selected profile configuration form on the right.
-  - *Mobile*: Stacks vertically (categories browser on top, configuration form below).
+- **Presets**: 
+  - *Desktop*: Two columns split equally (50%/50% width): preset categories tree on the left, selected preset configuration form on the right.
+  - *Mobile*: Stacks vertically (preset categories browser on top, configuration form below).
+  - *Preset Drag and Drop*: Presets inside the categories tree can be dragged and dropped into other categories to move them. The destination category is visually highlighted with a dashed accent border during drag-over. If a name collision occurs in the target category, a pop-up alert informs the user and cancels the move.
 - **Tools**:
-  - *Desktop*: Two columns: file browser on the left, dry-run tool configuration controls (FPS Deduplication or VMAF Scanner) and detailed result dashboard on the right.
+  - *Desktop*: Two columns split equally (50%/50% width): file browser on the left, dry-run tool configuration controls (FPS Deduplication or VMAF Scanner) and detailed result dashboard on the right.
   - *Mobile*: Stacks vertically (file browser on top, tool config and results below).
+  - *Clear Old Results*: When a new scan run is triggered, the result dashboard container is cleared of old output so that the user is not confused by stale results while the new run progresses.
 - **Settings**: 
   - Linear single-column layout containing all settings forms (including folders, system configurations, crash recovery behavior, and global Privacy Mode preferences), styled with responsive inputs.
 
@@ -40,7 +47,7 @@ The application layout dynamically adapts to screen sizes to ensure full usabili
 The logo should represent two gears churning through film spool.
 
 ## Features
-Profiles:
+Presets:
 - Codecs: libsvtav1, libx265, libx264
 - Preset, CRF, visual tune, pixel format, FPS mode
 - Selectable passthrough audio codecs, with fallback codec and bitrate
@@ -50,7 +57,7 @@ Profiles:
 - **Default Privacy Mode**: Privacy Mode must be disabled by default. Users can explicitly enable it under application settings.
 - **Search Feedback**: When a directory search yields no matches, the file browser must report context-specific feedback integrating the search term (e.g. `No file containing "BigBu" was found.`) to confirm search execution.
 - **Active Navigation Highlighting**: The sidebar navigation links must dynamically highlight only the active page and adapt to client-side popstate changes.
-- **UI Presentation**: The application logo remains static and does not animate. Preset overrides config forms are rendered directly below the profile preset selectors, with visual margins and paddings aligned.
+- **UI Presentation**: The application logo remains static and does not animate. Preset overrides config forms are rendered directly below the preset selectors, with visual margins and paddings aligned.
 - **Premium Dropdowns**: Dropdown select inputs (`select.form-control`) must use custom premium styling: a native arrow override (using `appearance: none`), a custom chevron SVG background indicator, matching focus transitions, and dark option background colors to align with the application's aesthetic.
 - **Minimalist & Modern Design**: The visual styling must be clean, simple, and flat. It must avoid heavy visual noise, radial color gradients on the body, glows, shadows, and glassmorphic blur filters. Main backgrounds must use deep flat charcoal/black colors, components must use clean flat dark surfaces with thin borders, and primary interactive elements (like active tabs and buttons) must use clean flat solid highlights (such as crisp white or solid pastel violet accent details) to establish a premium and modern minimalist layout.
 
@@ -59,15 +66,15 @@ Profiles:
 
 ## Implementation
 
-### Profiles
-There shall be profile categories, as well as the profiles themselves. The whole system shall be directory and file based. As this application will run dockerized, the user will mount an appdata directory. Inside this appdata directory shall be a "profiles" directory, where our profile categories are stored as directories, and the profiles are stored as TOML-based ".ebrake" files.  
+### Presets
+There shall be preset categories, as well as the presets themselves. The whole system shall be directory and file based. As this application will run dockerized, the user will mount an appdata directory. Inside this appdata directory shall be a "profiles" directory (holding our presets), where our preset categories are stored as directories, and the presets are stored as TOML-based ".ebrake" files.  
 
 Requirements:
-- Profiles MUST be inside categories
+- Presets MUST be inside categories
 - Categories CANNOT nest inside other categories
-- The content of the profile files is TOML-based, sectioned into: video encoding, audio encoding, output formatting
+- The content of the preset files is TOML-based, sectioned into: video encoding, audio encoding, output formatting
 
-Profile TOML content:
+Preset TOML content:
 - Video encoding
   - Codec: libsvtav1, libx265, libx264
   - Preset: number or text, depending on codec
@@ -122,7 +129,7 @@ source_fps | REAL | detected original FPS of the source video
 unduplicated_fps | REAL | effective FPS after removing duplicate frames
 result_fps | REAL | final target FPS of the output video
 target_vmaf | REAL | target VMAF score for automatic CRF selection (NULL if fixed CRF)
-selected_crf | INTEGER | chosen CRF value (either fixed from profile, or determined via VMAF tests)
+selected_crf | INTEGER | chosen CRF value (either fixed from preset, or determined via VMAF tests)
 measured_vmaf | REAL | final measured average VMAF of the output file
 
 ### Media Files SQL Schema
@@ -189,26 +196,26 @@ To provide a robust, host-system-agnostic, and fast search feature in Docker tha
 
 ### Job Configuration Override & Serialization Design
 
-To allow users to modify encoding settings for a specific job without creating clutter in their profile files, the application uses a DB-serialized override system.
+To allow users to modify encoding settings for a specific job without creating clutter in their preset files, the application uses a DB-serialized override system.
 
 #### 1. Serialization Flow
-1. **Profile Load**: When the user selects a profile in the "Create Job" UI, the backend reads the corresponding `.ebrake` (TOML) file.
-2. **Form Pre-fill**: The UI renders a configuration panel pre-filled with all parameters defined in the profile (CRF, preset, codecs, audio, etc.).
+1. **Preset Load**: When the user selects a preset in the "Create Job" UI, the backend reads the corresponding `.ebrake` (TOML) file.
+2. **Form Pre-fill**: The UI renders a configuration panel pre-filled with all parameters defined in the preset (CRF, preset, codecs, audio, etc.).
 3. **UI Customization**: The user can alter any configuration inputs (e.g. override CRF from 22 to 25).
 4. **Job Dispatch**: When the user clicks "Start Transcode" or "Add to Queue":
    - The frontend sends a `POST` request to `/api/jobs` containing:
      - `input_path`
-     - `category` (selected profile category)
-     - `preset` (selected profile name)
+     - `category` (selected preset category)
+     - `preset` (selected preset name)
      - A payload of overridden values (or the entire compiled configuration set).
    - The backend validates the parameters and resolves the final configuration.
-   - If any values differ from the original TOML profile, `is_customized` is set to `true`.
+   - If any values differ from the original TOML preset, `is_customized` is set to `true`.
    - The resolved configuration is serialized as a JSON string and saved directly into the `preset_config` column of the `jobs` table.
 
 #### 2. Robustness and Isolation Benefits
-- **Deletion Resilience**: If the user later modifies or deletes the original `.ebrake` profile in the filesystem, all previously queued, running, or completed jobs remain executable and fully auditable because their execution parameters are frozen inside `preset_config`.
+- **Deletion Resilience**: If the user later modifies or deletes the original `.ebrake` preset in the filesystem, all previously queued, running, or completed jobs remain executable and fully auditable because their execution parameters are frozen inside `preset_config`.
 - **Easy Retry**: If a job fails or needs to be duplicated, the backend can reconstruct the exact same parameters by parsing `preset_config` rather than referencing external files.
-- **Auditing UI**: The "Jobs" page details tab can display the exact configuration JSON used for that specific run, showing modified settings highlighted next to original profile defaults.
+- **Auditing UI**: The "Jobs" page details tab can display the exact configuration JSON used for that specific run, showing modified settings highlighted next to original preset defaults.
 
 ### Duplicate Frame Detection & VMAF Auto-CRF Design
 
@@ -624,7 +631,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     category TEXT,
     preset TEXT,
     is_customized BOOLEAN NOT NULL DEFAULT 0 CHECK(is_customized IN (0, 1)),
-    preset_config TEXT, -- JSON string containing final resolved profile params
+    preset_config TEXT, -- JSON string containing final resolved preset params
     subtitle_mode TEXT NOT NULL CHECK(subtitle_mode IN ('none', 'passthrough', 'burn-in')),
     selected_subtitle_track INTEGER,
     ffmpeg TEXT,
@@ -707,7 +714,7 @@ document.addEventListener('alpine:init', () => {
 
 To ensure the application operates correctly, two automated verification suites are available:
 
-1. **Lightweight Sanity Check (`verify.py`)**: A fast, dependency-free backend sanity check to test database storage, directory creation, default profile parser parsing, and basic queue sequencing without spawning any subprocesses or transcoding videos.
+1. **Lightweight Sanity Check (`verify.py`)**: A fast, dependency-free backend sanity check to test database storage, directory creation, default preset parser parsing, and basic queue sequencing without spawning any subprocesses or transcoding videos.
 2. **Robust Integration Suite (`verify_integration.py`)**: A full end-to-end integration suite that programmatically generates synthetic media files with repeated frames and subtitle tracks, runs actual `ffmpeg` and `ffprobe` processes in a sandboxed environment, tests transcoding pipelines, and simulates web API requests.
 
 ### verify.py Capabilities
@@ -718,7 +725,7 @@ Currently, `verify.py` validates the following functionalities:
   - **Directory Creation**: Verifies that `init_directories()` successfully creates required app folders.
   - **Database Setup**: Verifies that `init_db()` creates the SQLite database at `DB_PATH`.
   - **Settings CRUD**: Validates that system configuration read/write operations work by setting and getting a test key.
-  - **Profile Configuration**: Loads the profile manager via `init_profiles()` and ensures that the categories list includes the `"Default"` category, and that the `"AV1 VMAF Auto-CRF"` profile correctly parses the SVT-AV1 codec settings.
+  - **Preset Configuration**: Loads the preset manager via `init_profiles()` and ensures that the categories list includes the `"Default"` category, and that the `"AV1 VMAF Auto-CRF"` preset correctly parses the SVT-AV1 codec settings.
 - **Queue and 'Transcode Next' Scheduling (`test_queues`)**:
   - **Priority Ordering**: Creates two pending jobs and verifies they are sorted in descending order of priority.
   - **Transcode Next Insertion**: Promotes a lower-priority job to "Transcode Next" and asserts that it takes precedence at the front of the queue.

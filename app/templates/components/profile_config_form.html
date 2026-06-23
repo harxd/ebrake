@@ -1,9 +1,12 @@
-<form id="profile-config-form" hx-post="/api/profiles/save" hx-target="#profile-save-status">
+<form id="profile-config-form" hx-post="/api/profiles/save" hx-target="#profile-save-status"
+      oninput="document.getElementById('profile-save-btn').removeAttribute('disabled')"
+      onchange="document.getElementById('profile-save-btn').removeAttribute('disabled')"
+      hx-on::after-request="if (event.detail.successful && !event.detail.xhr.responseText.includes('alert-danger')) flashSaveSuccess('profile-save-btn')">
     
     <div class="panel-header-row">
         <h3 class="panel-title">
             <i class="fa-solid fa-file-pen"></i> 
-            Editing Preset: <strong class="text-primary">{{ preset_name | default('New Preset') }}</strong> in <strong class="text-folder">{{ category }}</strong>
+            <strong style="color: var(--color-primary);">{{ preset_name | default('New Preset') }}</strong> in <strong class="text-folder">{{ category }}</strong>
         </h3>
     </div>
     
@@ -11,12 +14,11 @@
     
     <!-- Hidden Category and Name settings -->
     <input type="hidden" name="category" value="{{ category }}">
+    <input type="hidden" name="original_preset_name" value="{{ preset_name | default('') }}">
     
     <div class="form-group">
-        <label>Preset Name (Will be saved as filename.ebrake)</label>
-        <input type="text" name="preset_name" class="form-control" value="{{ preset_name | default('') }}" placeholder="e.g. AV1 Ultra Quality" required 
-               {% if preset_name %}readonly{% endif %}>
-        {% if preset_name %}<span class="input-tip">Preset name cannot be renamed directly. Create a new preset to change names.</span>{% endif %}
+        <label>Preset Name</label>
+        <input type="text" name="preset_name" class="form-control" value="{{ preset_name | default('') }}" placeholder="e.g. AV1 Ultra Quality" required>
     </div>
     
     <hr class="divider">
@@ -29,10 +31,16 @@
 </form>
 
 {% if request.headers.get("HX-Request") == "true" %}
-<!-- Swap enabled save button into the permanent page footer -->
-<footer class="action-footer" id="page-action-footer" hx-swap-oob="true">
-    <button type="submit" form="profile-config-form" class="btn btn-primary btn-large" id="profile-save-btn">
-        <i class="fa-solid fa-save"></i> Save Profile Preset
+<!-- Swap disabled save button into the permanent page action bar -->
+<div class="action-bar" id="page-action-bar" hx-swap-oob="true">
+    <button type="submit" form="profile-config-form" class="btn btn-primary btn-large" id="profile-save-btn" disabled>
+        <i class="fa-solid fa-save"></i> Save Preset
     </button>
-</footer>
+</div>
+{% endif %}
+
+{% if just_renamed %}
+<script>
+    flashSaveSuccess('profile-save-btn');
+</script>
 {% endif %}

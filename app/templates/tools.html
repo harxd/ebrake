@@ -23,7 +23,8 @@
                 <p>Scans the selected video stream to count identical adjacent frames. Calculates potential space savings if encoded with variable frame rate drop (`mpdecimate`).</p>
             </div>
             
-            <form id="dedup-form" hx-post="/api/tools/dedup" hx-target="#dedup-result-container" hx-indicator="#dedup-loading">
+            <form id="dedup-form" hx-post="/api/tools/dedup" hx-target="#dedup-result-container" hx-indicator="#dedup-loading"
+                  hx-on::before-request="document.getElementById('dedup-result-container').innerHTML = ''">
                 <input type="hidden" name="file_path" id="tool_file_path_field" required>
                 
                 <div class="form-actions-left">
@@ -46,7 +47,8 @@
                 <p>Simulates quality and file size output by transcoding a small 10-second segment at the center of the video with your configurations.</p>
             </div>
             
-            <form id="vmaf-form" hx-post="/api/tools/vmaf" hx-target="#vmaf-result-container" hx-indicator="#vmaf-loading">
+            <form id="vmaf-form" hx-post="/api/tools/vmaf" hx-target="#vmaf-result-container" hx-indicator="#vmaf-loading"
+                  hx-on::before-request="document.getElementById('vmaf-result-container').innerHTML = ''">
                 <input type="hidden" name="file_path" id="tool_file_path_field_vmaf" required>
                 
                 <div class="form-row">
@@ -123,23 +125,27 @@
 </script>
 
 {% if request.headers.get("HX-Request") == "true" %}
-<!-- Page Action Footer OOB Swap -->
-<footer class="action-footer" id="page-action-footer" hx-swap-oob="true">
+<!-- Page Action Bar OOB Swap -->
+<div class="action-bar" id="page-action-bar" hx-swap-oob="true">
     <!-- Dedup submit button -->
     <button type="submit" 
+            id="tool-dedup-btn"
             form="dedup-form" 
             class="btn btn-primary btn-large" 
-            x-show="$store.tools.active === 'dedup'">
+            x-show="$store.tools.active === 'dedup'"
+            disabled>
         <i class="fa-solid fa-square-poll-vertical"></i> Run Deduplication Scan
     </button>
     
     <!-- VMAF submit button -->
     <button type="submit" 
+            id="tool-vmaf-btn"
             form="vmaf-form" 
             class="btn btn-primary btn-large" 
             onclick="syncVmafFilePath()" 
-            x-show="$store.tools.active === 'vmaf'">
+            x-show="$store.tools.active === 'vmaf'"
+            disabled>
         <i class="fa-solid fa-play"></i> Run VMAF Quality Scan
     </button>
-</footer>
+</div>
 {% endif %}

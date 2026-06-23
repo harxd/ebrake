@@ -11,7 +11,7 @@
         </div>
     </div>
     
-    <!-- Right Column: Profile Editor Workstation -->
+    <!-- Right Column: Preset Editor Workstation -->
     <div class="panel card glass" id="profile-config-container">
         <div class="empty-state">
             <i class="fa-solid fa-sliders text-muted"></i>
@@ -23,12 +23,12 @@
 </div>
 
 {% if request.headers.get("HX-Request") == "true" %}
-<!-- Page Action Footer OOB Swap -->
-<footer class="action-footer" id="page-action-footer" hx-swap-oob="true">
+<!-- Page Action Bar OOB Swap -->
+<div class="action-bar" id="page-action-bar" hx-swap-oob="true">
     <button type="submit" form="profile-config-form" class="btn btn-primary btn-large" id="profile-save-btn" disabled>
-        <i class="fa-solid fa-save"></i> Save Profile Preset
+        <i class="fa-solid fa-save"></i> Save Preset
     </button>
-</footer>
+</div>
 {% endif %}
 
 <script>

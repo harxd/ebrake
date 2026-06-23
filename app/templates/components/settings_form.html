@@ -1,8 +1,8 @@
-<form hx-post="/api/settings" hx-target="#settings-form-wrapper" class="settings-form">
+<form hx-post="/api/settings" hx-target="#settings-form-wrapper" class="settings-form"
+      oninput="document.getElementById('settings-save-btn').removeAttribute('disabled')"
+      onchange="document.getElementById('settings-save-btn').removeAttribute('disabled')">
     
     {% if success_msg %}
-        <div class="alert alert-success">{{ success_msg }}</div>
-        
         <!-- Out-of-band updates to sync the body class state for Privacy Mode -->
         <script>
             // Update the Alpine global store state immediately
@@ -16,6 +16,8 @@
                     document.body.classList.remove('privacy-enabled');
                 }
             }
+            // Trigger save success feedback
+            flashSaveSuccess('settings-save-btn');
         </script>
     {% endif %}
     
@@ -53,7 +55,7 @@
     </div>
     
     <div class="form-actions-left">
-        <button type="submit" class="btn btn-primary btn-large">
+        <button type="submit" class="btn btn-primary btn-large" id="settings-save-btn" disabled>
             <i class="fa-solid fa-floppy-disk"></i> Save System Settings
         </button>
     </div>

@@ -14,7 +14,10 @@
     
     <ul class="category-tree">
         {% for cat, presets in profiles_tree.items() %}
-            <li class="category-tree-item">
+            <li class="category-tree-item"
+                ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                ondragleave="this.classList.remove('drag-over')"
+                ondrop="dropPreset(event, '{{ cat | replace('\'', '\\\'') }}')">
                 <div class="category-header">
                     <span class="category-title-row">
                         <i class="fa-solid fa-folder-open text-folder"></i>
@@ -32,6 +35,8 @@
                 <ul class="preset-tree-list">
                     {% for preset in presets %}
                         <li class="preset-tree-item"
+                            draggable="true"
+                            ondragstart="dragPreset(event, '{{ cat | replace('\'', '\\\'') }}', '{{ preset | replace('\'', '\\\'') }}')"
                             hx-get="/api/profiles/config-fields?category={{ cat | urlencode }}&name={{ preset | urlencode }}"
                             hx-target="#profile-config-container"
                             hx-trigger="click">
@@ -69,3 +74,73 @@
         {% endfor %}
     </ul>
 </div>
+
+<script>
+    if (!window.presetDragHandlersRegistered) {
+        window.presetDragHandlersRegistered = true;
+        
+        document.body.addEventListener('presetMoveCollision', function(evt) {
+            alert(evt.detail.value);
+        });
+    }
+
+    function dragPreset(event, category, name) {
+        event.stopPropagation();
+        event.dataTransfer.setData("text/plain", JSON.stringify({ category, name }));
+        event.dataTransfer.effectAllowed = "move";
+        event.currentTarget.classList.add('dragging');
+    }
+
+    function dropPreset(event, targetCategory) {
+        event.preventDefault();
+        event.currentTarget.classList.remove('drag-over');
+        
+        try {
+            const data = JSON.parse(event.dataTransfer.getData("text/plain"));
+            const { category: sourceCategory, name: presetName } = data;
+            
+            document.querySelectorAll('.preset-tree-item.dragging').forEach(el => {
+                el.classList.remove('dragging');
+            });
+            
+            if (sourceCategory === targetCategory) {
+                return;
+            }
+            
+            // Trigger move API request via HTMX
+            htmx.ajax('POST', '/api/profiles/move', {
+                values: {
+                    preset_name: presetName,
+                    from_category: sourceCategory,
+                    to_category: targetCategory
+                },
+                target: '#profiles-tree-root',
+                swap: 'innerHTML'
+            });
+            
+            // Check if the moved preset is the one currently loaded in the editor
+            const originalNameField = document.querySelector('input[name="original_preset_name"]');
+            const categoryField = document.querySelector('input[name="category"]');
+            if (originalNameField && categoryField) {
+                if (originalNameField.value === presetName && categoryField.value === sourceCategory) {
+                    // Reload the form with the new category and name
+                    htmx.ajax('GET', `/api/profiles/config-fields?category=${encodeURIComponent(targetCategory)}&name=${encodeURIComponent(presetName)}`, {
+                        target: '#profile-config-container',
+                        swap: 'innerHTML'
+                    });
+                }
+            }
+        } catch (e) {
+            console.error("Failed to parse drag payload:", e);
+        }
+    }
+    
+    document.addEventListener('dragend', function() {
+        document.querySelectorAll('.preset-tree-item.dragging').forEach(el => {
+            el.classList.remove('dragging');
+        });
+        document.querySelectorAll('.category-tree-item.drag-over').forEach(el => {
+            el.classList.remove('drag-over');
+        });
+    });
+</script>

@@ -1,5 +1,7 @@
 import os
 import logging
+import shutil
+import json
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Dict, Any, List, Optional
@@ -317,8 +319,9 @@ async def api_profile_save(
     request: Request,
     category: str = Form(...),
     preset_name: str = Form(...),
+    original_preset_name: Optional[str] = Form(None),
     codec: str = Form(...),
-    preset: str = Form(...),
+    preset_val: str = Form(...),
     crf: int = Form(...),
     visual_tune: int = Form(0),
     fps: str = Form("same as source"),
@@ -337,11 +340,20 @@ async def api_profile_save(
     container: str = Form("mkv")
 ):
     """Save/update preset ebrake TOML file."""
+    # Collision check
+    rename_occurred = False
+    if original_preset_name and original_preset_name != preset_name:
+        existing = get_profile(category, preset_name)
+        if existing:
+            response_html = f"<div class='alert alert-danger'>A preset named '{preset_name}' already exists in category '{category}'.</div>"
+            return HTMLResponse(content=response_html)
+        rename_occurred = True
+
     # Build profile structure
     profile_data = {
         "video": {
             "codec": codec,
-            "preset": preset,
+            "preset": preset_val,
             "crf": crf,
             "visual_tune": visual_tune,
             "fps": fps,
@@ -372,15 +384,29 @@ async def api_profile_save(
     
     success = save_profile(category, preset_name, profile_data)
     
+    # If rename was successful, delete the old preset BEFORE listing profiles for tree reload
+    if success and rename_occurred:
+        delete_profile(category, original_preset_name)
+    
     # Return HTML message + reload categories tree
-    response_html = f"<div class='alert alert-success'>Preset '{preset_name}' saved successfully.</div>"
+    response_html = ""
     # Trigger categories out-of-band updates
-    response_html += templates.TemplateResponse(request, "components/profiles_tree.html", {
+    tree_html = templates.TemplateResponse(request, "components/profiles_tree.html", {
         "profiles_tree": get_all_profiles(),
         "categories": list_categories()
-    }, headers={"HX-Trigger": "profileChanged"}).body.decode()
+    }).body.decode()
+    response_html += f"<div id='profiles-tree-root' hx-swap-oob='true'>{tree_html}</div>"
     
-    return HTMLResponse(content=response_html)
+    if success and rename_occurred:
+        form_html = templates.TemplateResponse(request, "components/profile_config_form.html", {
+            "category": category,
+            "preset_name": preset_name,
+            "profile": profile_data,
+            "just_renamed": True
+        }).body.decode()
+        response_html += f"<div id='profile-config-container' class='panel card glass' hx-swap-oob='true'>{form_html}</div>"
+        
+    return HTMLResponse(content=response_html, headers={"HX-Trigger": "profileChanged"})
 
 @app.post("/api/profiles/category/create", response_class=HTMLResponse)
 async def api_create_category(request: Request, name: str = Form(...)):
@@ -408,6 +434,41 @@ async def api_delete_profile(request: Request, category: str, name: str):
         "profiles_tree": get_all_profiles(),
         "categories": list_categories()
     })
+
+@app.post("/api/profiles/move", response_class=HTMLResponse)
+async def api_profile_move(
+    request: Request,
+    preset_name: str = Form(...),
+    from_category: str = Form(...),
+    to_category: str = Form(...)
+):
+    """Move preset file from one category directory to another."""
+    from_path = PROFILES_DIR / from_category / f"{preset_name}.ebrake"
+    to_path = PROFILES_DIR / to_category / f"{preset_name}.ebrake"
+    
+    headers = {}
+    if not from_path.exists():
+        headers["HX-Trigger"] = json.dumps({"presetMoveCollision": f"Preset '{preset_name}' not found."})
+    elif to_path.exists():
+        headers["HX-Trigger"] = json.dumps({"presetMoveCollision": f"A preset named '{preset_name}' already exists in category '{to_category}'."})
+    else:
+        try:
+            shutil.move(str(from_path), str(to_path))
+        except Exception as e:
+            logger.error(f"Failed to move preset: {e}")
+            headers["HX-Trigger"] = json.dumps({"presetMoveCollision": f"System error moving preset: {e}"})
+            
+    # Always return tree HTML so the list remains valid and updates
+    tree_html = templates.TemplateResponse(request, "components/profiles_tree.html", {
+        "profiles_tree": get_all_profiles(),
+        "categories": list_categories()
+    })
+    
+    # Apply headers if any
+    for k, v in headers.items():
+        tree_html.headers[k] = v
+        
+    return tree_html
 
 # API ENDPOINTS - JOBS CRUD & QUEUE REORDERING
 

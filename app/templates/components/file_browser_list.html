@@ -43,9 +43,15 @@
         
         if (inputField) {
             inputField.value = path;
+            const jobBtn = document.getElementById('job-submit-btn');
+            if (jobBtn) jobBtn.removeAttribute('disabled');
         }
         if (toolInputField) {
             toolInputField.value = path;
+            const dedupBtn = document.getElementById('tool-dedup-btn');
+            const vmafBtn = document.getElementById('tool-vmaf-btn');
+            if (dedupBtn) dedupBtn.removeAttribute('disabled');
+            if (vmafBtn) vmafBtn.removeAttribute('disabled');
         }
         if (selectedLabel) {
             selectedLabel.innerText = name;
