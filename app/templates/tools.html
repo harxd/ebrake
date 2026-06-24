@@ -4,15 +4,18 @@
     {% include "components/file_browser.html" %}
     
     <!-- Right Column: Dry-Run Workspaces -->
-    <div class="panel card glass flex-column">
+    <div class="panel card glass flex-column" x-data="{ activeTarget: 'ref' }">
         
         <!-- Tabs selectors -->
         <div class="tabs-header">
-            <button class="tab-btn" :class="{ 'active': $store.tools.active === 'dedup' }" @click="$store.tools.active = 'dedup'">
+            <button class="tab-btn" :class="{ 'active': $store.tools.active === 'dedup' }" @click="$store.tools.active = 'dedup'; window.activeFileInputId = null;">
                 <i class="fa-solid fa-gauge-simple"></i> FPS Deduplication
             </button>
-            <button class="tab-btn" :class="{ 'active': $store.tools.active === 'vmaf' }" @click="$store.tools.active = 'vmaf'">
-                <i class="fa-solid fa-gauge-high"></i> VMAF Quality Simulator
+            <button class="tab-btn" :class="{ 'active': $store.tools.active === 'vmaf_autocrf' }" @click="$store.tools.active = 'vmaf_autocrf'; window.activeFileInputId = null; loadAutocrfPresetFields();">
+                <i class="fa-solid fa-gauge-high"></i> VMAF Auto-CRF
+            </button>
+            <button class="tab-btn" :class="{ 'active': $store.tools.active === 'vmaf_compare' }" @click="$store.tools.active = 'vmaf_compare'; window.activeFileInputId = 'tool_file_path_field_compare_ref'; activeTarget = 'ref';">
+                <i class="fa-solid fa-arrows-left-right"></i> VMAF Comparison
             </button>
         </div>
         
@@ -40,47 +43,131 @@
             </div>
         </div>
         
-        <!-- Tab Content: VMAF Quality Simulator -->
-        <div class="tab-content" x-show="$store.tools.active === 'vmaf'">
+        <!-- Tab Content: VMAF Auto-CRF -->
+        <div class="tab-content" x-show="$store.tools.active === 'vmaf_autocrf'">
             <div class="tab-instruction">
-                <h4>VMAF Quality Simulator</h4>
-                <p>Simulates quality and file size output by transcoding a small 10-second segment at the center of the video with your configurations.</p>
+                <h4>VMAF Auto-CRF Scan</h4>
+                <p>Finds the optimal Constant Rate Factor (CRF) value to achieve your target visual quality on the selected video using binary search simulations.</p>
             </div>
             
-            <form id="vmaf-form" hx-post="/api/tools/vmaf" hx-target="#vmaf-result-container" hx-indicator="#vmaf-loading"
-                  hx-on::before-request="document.getElementById('vmaf-result-container').innerHTML = ''">
-                <input type="hidden" name="file_path" id="tool_file_path_field_vmaf" required>
+            <form id="vmaf-autocrf-form" hx-post="/api/tools/vmaf-autocrf" hx-target="#vmaf-autocrf-result-container" hx-indicator="#vmaf-autocrf-loading"
+                  hx-on::before-request="document.getElementById('vmaf-autocrf-result-container').innerHTML = ''">
+                <input type="hidden" name="file_path" id="tool_file_path_field_autocrf" required>
                 
-                <div class="form-row">
+
+
+                <div class="profile-selection-row" style="margin-top: 12px;">
                     <div class="form-group">
-                        <label>Codec</label>
-                        <select name="codec" class="form-control" onchange="toggleToolPresetOptions(this.value)">
-                            <option value="libsvtav1">SVT-AV1 (libsvtav1)</option>
-                            <option value="libx265">H.265 (libx265)</option>
-                            <option value="libx264">H.264 (libx264)</option>
+                        <label>Preset Category</label>
+                        <select name="category" class="form-control"
+                                hx-get="/api/profiles/presets-list" 
+                                hx-target="#preset_select_autocrf"
+                                hx-trigger="change"
+                                onchange="loadAutocrfPresetFields()">
+                            {% for cat in categories %}
+                                <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
                         </select>
                     </div>
+                    
                     <div class="form-group">
                         <label>Preset</label>
-                        <input type="text" name="preset" id="tool_preset_input" class="form-control" value="6" placeholder="e.g. 6 or fast">
-                    </div>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>CRF (Constant Rate Factor)</label>
-                        <input type="number" name="crf" class="form-control" value="24" min="0" max="51">
-                    </div>
-                    <div class="form-group">
-                        <label>Pixel Format</label>
-                        <select name="pixel_format" class="form-control">
-                            <option value="yuv420p">yuv420p (8-bit)</option>
-                            <option value="yuv420p10le" selected>yuv420p10le (10-bit HDR)</option>
+                        <select name="preset" id="preset_select_autocrf" class="form-control"
+                                onchange="loadAutocrfPresetFields()">
+                            {% for preset_name in presets %}
+                                <option value="{{ preset_name }}">{{ preset_name }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                 </div>
+
+                <div class="panel-header-row" style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                    <h4 class="panel-title" style="font-size: 15px;"><i class="fa-solid fa-sliders"></i> Preset Overrides</h4>
+                </div>
                 
-                <div class="form-group checkbox-group">
+                <div id="autocrf-profile-overrides-fields">
+                    {% if profile %}
+                        {% include "components/profile_overrides.html" %}
+                    {% endif %}
+                </div>
+                
+                <div class="form-actions-left">
+                    <span id="vmaf-autocrf-loading" class="htmx-indicator loader-badge"><i class="fa-solid fa-spinner fa-spin"></i> Estimating optimal CRF...</span>
+                </div>
+            </form>
+            
+            <div id="vmaf-autocrf-result-container" class="tool-result-box">
+                <div class="placeholder-result text-muted">
+                    <i class="fa-solid fa-award"></i>
+                    <p>Select a video file and click run to analyze optimal CRF quality settings.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tab Content: VMAF Comparison -->
+        <div class="tab-content" x-show="$store.tools.active === 'vmaf_compare'">
+            <div class="tab-instruction">
+                <h4>VMAF Comparison Tool</h4>
+                <p>Select a reference (source) file and a distorted (transcoded) file to calculate the absolute VMAF quality score. (Distorted resolution will scale to match reference if different).</p>
+            </div>
+            
+            <form id="vmaf-compare-form" hx-post="/api/tools/vmaf-compare" hx-target="#vmaf-compare-result-container" hx-indicator="#vmaf-compare-loading"
+                  hx-on::before-request="document.getElementById('vmaf-compare-result-container').innerHTML = ''">
+                
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label>Reference Video (Source)</label>
+                    <div class="input-group">
+                        <input type="text" id="tool_file_path_field_compare_ref" name="ref_path" class="form-control" readonly placeholder="Click Select to target this field, then choose file..." :style="activeTarget === 'ref' ? 'border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-glow);' : ''" @click="activeTarget = 'ref'; window.activeFileInputId = 'tool_file_path_field_compare_ref';">
+                        <button type="button" class="btn btn-icon" :class="activeTarget === 'ref' ? 'btn-primary' : 'btn-secondary'" @click="activeTarget = 'ref'; window.activeFileInputId = 'tool_file_path_field_compare_ref';">
+                            <i class="fa-solid fa-crosshairs"></i> Select
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label>Distorted Video (Transcoded)</label>
+                    <div class="input-group">
+                        <input type="text" id="tool_file_path_field_compare_dist" name="dist_path" class="form-control" readonly placeholder="Click Select to target this field, then choose file..." :style="activeTarget === 'dist' ? 'border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-glow);' : ''" @click="activeTarget = 'dist'; window.activeFileInputId = 'tool_file_path_field_compare_dist';">
+                        <button type="button" class="btn btn-icon" :class="activeTarget === 'dist' ? 'btn-primary' : 'btn-secondary'" @click="activeTarget = 'dist'; window.activeFileInputId = 'tool_file_path_field_compare_dist';">
+                            <i class="fa-solid fa-crosshairs"></i> Select
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>VMAF Model</label>
+                        <select name="vmaf_model" class="form-control">
+                            <option value="1080p" selected>1080p (Standard / 3H)</option>
+                            <option value="4k_near">4K Near (1.5H display height)</option>
+                            <option value="4k_far">4K Far (3H display height / 1080p acuity)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div x-data="{ compareMode: 'sampled' }" style="margin-top: 14px;">
+                    <div class="form-group">
+                        <label>Evaluation Range</label>
+                        <select name="compare_mode" class="form-control" x-model="compareMode">
+                            <option value="full">Calculate on whole video (Slowest / Full Sweep)</option>
+                            <option value="segment">Custom Video Segment (Start & Duration)</option>
+                            <option value="sampled" selected>Sampled Segments (Fastest / Recommended)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-row" x-show="compareMode === 'segment'" style="margin-top: 12px;" x-transition>
+                        <div class="form-group">
+                            <label>Start Time (seconds)</label>
+                            <input type="number" step="0.1" name="start_time" class="form-control" value="0.0" min="0.0">
+                        </div>
+                        <div class="form-group">
+                            <label>Duration (seconds)</label>
+                            <input type="number" step="0.1" name="duration" class="form-control" value="10.0" min="1.0">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group checkbox-group" style="margin-top: 16px;">
                     <label class="checkbox-container">
                         <input type="checkbox" name="dedup" value="true">
                         <span class="checkmark"></span>
@@ -89,14 +176,14 @@
                 </div>
                 
                 <div class="form-actions-left">
-                    <span id="vmaf-loading" class="htmx-indicator loader-badge"><i class="fa-solid fa-spinner fa-spin"></i> Running quality tests...</span>
+                    <span id="vmaf-compare-loading" class="htmx-indicator loader-badge"><i class="fa-solid fa-spinner fa-spin"></i> Running comparison...</span>
                 </div>
             </form>
             
-            <div id="vmaf-result-container" class="tool-result-box">
+            <div id="vmaf-compare-result-container" class="tool-result-box">
                 <div class="placeholder-result text-muted">
-                    <i class="fa-solid fa-award"></i>
-                    <p>Select a video file and click run to calculate scores.</p>
+                    <i class="fa-solid fa-arrows-left-right"></i>
+                    <p>Select reference and distorted videos, then click run to compare quality scores.</p>
                 </div>
             </div>
         </div>
@@ -106,21 +193,33 @@
 </div>
 
 <script>
-    function toggleToolPresetOptions(codec) {
-        const presetInput = document.getElementById('tool_preset_input');
-        if (!presetInput) return;
+    function loadAutocrfPresetFields() {
+        const catSelect = document.querySelector('#vmaf-autocrf-form select[name="category"]');
+        const preSelect = document.getElementById('preset_select_autocrf');
         
-        if (codec === 'libsvtav1') {
-            presetInput.value = '6';
-        } else {
-            presetInput.value = 'fast';
+        if (catSelect && preSelect) {
+            const category = catSelect.value;
+            const preset = preSelect.value;
+            if (category && preset) {
+                htmx.ajax('GET', `/api/profiles/select?category=${encodeURIComponent(category)}&preset=${encodeURIComponent(preset)}`, {
+                    target: '#autocrf-profile-overrides-fields',
+                    swap: 'innerHTML'
+                });
+            }
         }
     }
 
-    function syncVmafFilePath() {
-        // Sync the hidden file path fields
+    function syncAutocrfFilePath() {
         const sourcePath = document.getElementById('tool_file_path_field').value;
-        document.getElementById('tool_file_path_field_vmaf').value = sourcePath;
+        const autocrfInput = document.getElementById('tool_file_path_field_autocrf');
+        if (autocrfInput) {
+            autocrfInput.value = sourcePath;
+        }
+    }
+
+    function resetCompareInputs() {
+        // Automatically default target to ref on comparison tab entry
+        window.activeFileInputId = 'tool_file_path_field_compare_ref';
     }
 </script>
 
@@ -137,15 +236,25 @@
         <i class="fa-solid fa-square-poll-vertical"></i> Run Deduplication Scan
     </button>
     
-    <!-- VMAF submit button -->
+    <!-- VMAF Auto-CRF submit button -->
     <button type="submit" 
-            id="tool-vmaf-btn"
-            form="vmaf-form" 
+            id="tool-vmaf-autocrf-btn"
+            form="vmaf-autocrf-form" 
             class="btn btn-primary btn-large" 
-            onclick="syncVmafFilePath()" 
-            x-show="$store.tools.active === 'vmaf'"
+            onclick="syncAutocrfFilePath()" 
+            x-show="$store.tools.active === 'vmaf_autocrf'"
             disabled>
-        <i class="fa-solid fa-play"></i> Run VMAF Quality Scan
+        <i class="fa-solid fa-play"></i> Run VMAF Auto-CRF Scan
+    </button>
+
+    <!-- VMAF Comparison submit button -->
+    <button type="submit" 
+            id="tool-vmaf-compare-btn"
+            form="vmaf-compare-form" 
+            class="btn btn-primary btn-large" 
+            x-show="$store.tools.active === 'vmaf_compare'"
+            disabled>
+        <i class="fa-solid fa-right-left"></i> Run VMAF Comparison
     </button>
 </div>
 {% endif %}

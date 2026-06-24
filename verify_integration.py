@@ -29,7 +29,7 @@ from app.profiles import init_profiles, get_profile
 from app.scanner import run_library_sync
 from app.engine import (
     transcode_video, run_dedup_dryrun, run_vmaf_search, probe_video,
-    start_worker, pause_queue, resume_queue, queue_paused
+    start_worker, pause_queue, resume_queue, queue_paused, run_vmaf_comparison
 )
 from app.main import app, api_media_search, api_save_settings
 
@@ -292,8 +292,7 @@ def test_standalone_tools(input_file: Path):
     
     has_vmaf = check_ffmpeg_vmaf()
     if has_vmaf:
-        print("\nTesting standalone VMAF Search dryrun...")
-        # Direct run_vmaf_search test
+        print("\nTesting standalone VMAF Search dryrun with custom model...")
         crf = run_vmaf_search(
             input_path=input_file,
             codec="libx264",
@@ -303,11 +302,38 @@ def test_standalone_tools(input_file: Path):
             target_vmaf=95.0,
             crf_range=(20, 30),
             duration=5.0,
-            use_mpdecimate=False
+            use_mpdecimate=False,
+            model_type="4k_near"
         )
         assert 20 <= crf <= 30, f"VMAF Search dry-run returned out-of-bounds CRF: {crf}"
-        print(f"Selected CRF for 95.0 VMAF: {crf}")
+        print(f"Selected CRF for 95.0 VMAF (4K near model): {crf}")
         print("[OK] Standalone VMAF optimizer works.")
+        
+        print("\nTesting VMAF Comparison with resolution scaling...")
+        downscaled_file = media_dir / "temp_input_downscaled.mp4"
+        cmd_downscale = [
+            "ffmpeg", "-y",
+            "-i", str(input_file),
+            "-vf", "scale=160:120",
+            "-c:v", "libx264", "-an", "-sn",
+            str(downscaled_file)
+        ]
+        subprocess.run(cmd_downscale, capture_output=True, check=True)
+        
+        # Calculate VMAF score between 320x240 source and 160x120 downscaled
+        score = run_vmaf_comparison(
+            ref_path=input_file,
+            dist_path=downscaled_file,
+            start_time=0.0,
+            duration=2.0,
+            use_mpdecimate=False,
+            model_type="1080p"
+        )
+        assert score > 0.0, "VMAF score on scaled video should be positive!"
+        print(f"VMAF score with automatic resolution scaling: {score:.2f}")
+        
+        if downscaled_file.exists():
+            downscaled_file.unlink()
     else:
         print("\n[WARNING] FFmpeg lacks libvmaf support. Skipping Standalone VMAF dryrun test.")
         

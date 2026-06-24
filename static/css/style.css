@@ -143,9 +143,16 @@ a {
 }
 
 /* Privacy Toggle Sidebar Anchor */
-.privacy-toggle-wrapper {
+.sidebar-bottom-group {
     margin-top: auto;
-    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+.privacy-toggle-wrapper {
+    width: 100%;
 }
 
 .btn-privacy-toggle {
@@ -812,7 +819,12 @@ select.form-control option {
 }
 
 .status-active { color: var(--color-success); }
-.status-paused { color: var(--color-warning); }
+.status-pausing { color: var(--color-warning); }
+.status-paused { color: var(--color-danger); }
+
+.queues-bottom-tabs {
+    grid-column: span 2;
+}
 
 .queues-grid {
     display: grid;
@@ -1280,7 +1292,6 @@ select.form-control option {
 
 /* Persistent Status Panel in Sidebar */
 .sidebar-status-panel {
-    margin-top: auto;
     margin-bottom: 0;
     padding: 12px 16px;
     background: var(--bg-surface);
@@ -1521,6 +1532,10 @@ select.form-control option {
     .privacy-toggle-wrapper {
         display: none; /* Hide toggle wrapper on mobile navigation bar */
     }
+
+    .sidebar-bottom-group {
+        display: contents;
+    }
     
     /* Content panel wrapper spacing */
     .content-wrapper {
@@ -1546,6 +1561,10 @@ select.form-control option {
     .queues-grid {
         grid-template-columns: 1fr;
         gap: 20px;
+    }
+    
+    .queues-bottom-tabs {
+        grid-column: span 1;
     }
     
     .sidebar-status-panel {

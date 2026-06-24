@@ -25,6 +25,10 @@ running_job_process: Optional[subprocess.Popen] = None
 running_job_id: Optional[int] = None
 queue_paused: bool = False
 
+def is_queue_paused() -> bool:
+    """Check if the queue is paused."""
+    return queue_paused
+
 # Live progress tracking
 # Format: { job_id: { "progress": float, "fps": float, "speed": str, "eta": str, "ffmpeg_pid": int } }
 running_progress: Dict[int, Dict[str, Any]] = {}
@@ -224,19 +228,51 @@ def run_dedup_dryrun(file_path: Path) -> Dict[str, Any]:
         "saved_space_pct": saved_space_pct
     }
 
-def run_vmaf_comparison(ref_path: Path, dist_path: Path, start_time: float, duration: float, use_mpdecimate: bool, duplicate_threshold: float = 0.001) -> float:
+def get_vmaf_model_filter_param(model_type: str) -> str:
+    """Resolves VMAF model path or built-in version string based on type."""
+    if model_type == "4k_near":
+        path = Path("/usr/share/model/vmaf_4k_v0.6.1.json")
+        if path.exists():
+            return f"model='path={escape_filter_path(path)}'"
+        return "model='version=vmaf_4k_v0.6.1'"
+    else:  # 1080p or 4k_far
+        path = Path("/usr/share/model/vmaf_v0.6.1.json")
+        if path.exists():
+            return f"model='path={escape_filter_path(path)}'"
+        return "model='version=vmaf_v0.6.1'"
+
+def run_vmaf_comparison(
+    ref_path: Path, 
+    dist_path: Path, 
+    start_time: float, 
+    duration: float, 
+    use_mpdecimate: bool, 
+    duplicate_threshold: float = 0.001,
+    model_type: str = "1080p"
+) -> float:
     """
     Computes VMAF on segment samples.
     Saves JSON results and returns mean score.
+    Automatically upscales distorted video to reference video resolution if needed.
     """
     log_file = TEMP_DIR / f"vmaf_{int(time.time() * 1000)}.json"
     escaped_log = escape_filter_path(log_file)
     
+    model_param = get_vmaf_model_filter_param(model_type)
+    
+    # We always use scale2ref to scale the distorted video ([1:v]) to reference video ([0:v])
     filter_complex = ""
     if use_mpdecimate:
-        filter_complex = f"[0:v]mpdecimate=max=0:hi=64:lo=64:frac={duplicate_threshold}[ref];[1:v]null[dist];[ref][dist]libvmaf=log_fmt=json:log_path='{escaped_log}'"
+        filter_complex = (
+            f"[0:v]mpdecimate=max=0:hi=64:lo=64:frac={duplicate_threshold}[ref];"
+            f"[1:v][ref]scale2ref[dist_scaled][ref_out];"
+            f"[ref_out][dist_scaled]libvmaf={model_param}:log_fmt=json:log_path='{escaped_log}'"
+        )
     else:
-        filter_complex = f"[0:v]null[ref];[1:v]null[dist];[ref][dist]libvmaf=log_fmt=json:log_path='{escaped_log}'"
+        filter_complex = (
+            f"[1:v][0:v]scale2ref[dist_scaled][ref];"
+            f"[ref][dist_scaled]libvmaf={model_param}:log_fmt=json:log_path='{escaped_log}'"
+        )
         
     cmd = [
         "ffmpeg", "-y",
@@ -282,7 +318,8 @@ def run_vmaf_search(
     crf_range: Tuple[int, int],
     duration: float,
     use_mpdecimate: bool,
-    duplicate_threshold: float = 0.001
+    duplicate_threshold: float = 0.001,
+    model_type: str = "1080p"
 ) -> int:
     """
     Performs Binary Search optimization to find the CRF that yields target VMAF.
@@ -340,7 +377,8 @@ def run_vmaf_search(
                     start_time=ts,
                     duration=segment_duration,
                     use_mpdecimate=use_mpdecimate,
-                    duplicate_threshold=duplicate_threshold
+                    duplicate_threshold=duplicate_threshold,
+                    model_type=model_type
                 )
                 scores.append(score)
             except Exception as e:

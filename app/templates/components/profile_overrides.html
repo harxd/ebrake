@@ -149,10 +149,21 @@
     <div class="panel-section">
         <h4 class="section-title"><i class="fa-solid fa-bolt"></i> Extras & Optimizations</h4>
         
-        <div class="form-group">
-            <label>Target VMAF (Auto-CRF Selection)</label>
-            <input type="number" step="0.1" name="target_vmaf" class="form-control" value="{{ profile.optimization.target_vmaf }}" placeholder="e.g. 95.0 (0 to disable)">
-            <span class="input-tip">Searches CRF range automatically to match quality.</span>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Target VMAF (Auto-CRF Selection)</label>
+                <input type="number" step="0.1" name="target_vmaf" class="form-control" value="{{ profile.optimization.target_vmaf }}" placeholder="e.g. 95.0 (0 to disable)">
+                <span class="input-tip">Searches CRF range automatically to match quality.</span>
+            </div>
+            
+            <div class="form-group">
+                <label>VMAF Model</label>
+                <select name="vmaf_model" class="form-control">
+                    <option value="1080p" {% if profile.optimization.vmaf_model == '1080p' or not profile.optimization.vmaf_model %}selected{% endif %}>1080p (Standard / 3H)</option>
+                    <option value="4k_near" {% if profile.optimization.vmaf_model == '4k_near' %}selected{% endif %}>4K Near (1.5H display height)</option>
+                    <option value="4k_far" {% if profile.optimization.vmaf_model == '4k_far' %}selected{% endif %}>4K Far (3H display height / 1080p acuity)</option>
+                </select>
+            </div>
         </div>
         
         <div class="form-row">

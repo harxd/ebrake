@@ -25,7 +25,7 @@ from app.profiles import (
 from app.scanner import run_library_sync, start_periodic_scanner, is_library_syncing
 from app.engine import (
     start_worker, recover_orphaned_jobs, cancel_running_job,
-    resume_queue, pause_queue, queue_paused, get_running_progress,
+    resume_queue, pause_queue, is_queue_paused, get_running_progress,
     run_dedup_dryrun, run_vmaf_comparison, run_vmaf_search, probe_video,
     TEMP_DIR
 )
@@ -64,7 +64,7 @@ templates = Jinja2Templates(directory="app/templates")
 async def add_process_time_header(request: Request, call_next):
     # Retrieve current global privacy mode settings
     request.state.privacy_mode = get_setting("privacy_mode_enabled", False)
-    request.state.queue_paused = queue_paused
+    request.state.queue_paused = is_queue_paused()
     response = await call_next(request)
     return response
 
@@ -76,7 +76,10 @@ def render_page(request: Request, template_name: str, context: Dict[str, Any] = 
     # Inject request details and state flags
     context["request"] = request
     context["privacy_mode_enabled"] = get_setting("privacy_mode_enabled", False)
-    context["queue_paused"] = queue_paused
+    context["queue_paused"] = is_queue_paused()
+    
+    from app.database import get_jobs
+    context["any_running"] = any(j["status"] == "running" for j in get_jobs())
     
     is_htmx = request.headers.get("HX-Request") == "true"
     
@@ -156,8 +159,19 @@ async def profiles_page(request: Request):
 
 @app.get("/tools", response_class=HTMLResponse)
 async def tools_page(request: Request):
+    categories = list_categories()
+    default_category = categories[0] if categories else ""
+    default_presets = list_profiles(default_category) if default_category else []
+    
+    default_profile_data = None
+    if default_category and default_presets:
+        default_profile_data = get_profile(default_category, default_presets[0])
+        
     context = {
         "active_tab": "tools",
+        "categories": categories,
+        "presets": default_presets,
+        "profile": default_profile_data,
         "media_root": str(MEDIA_DIR)
     }
     return render_page(request, "tools.html", context)
@@ -330,6 +344,7 @@ async def api_profile_save(
     target_vmaf: float = Form(0.0),
     vmaf_min: int = Form(18),
     vmaf_max: int = Form(30),
+    vmaf_model: str = Form("1080p"),
     dedup: bool = Form(False),
     passthrough_codecs: List[str] = Form([]),
     fallback_codec: str = Form("aac"),
@@ -364,7 +379,8 @@ async def api_profile_save(
             "target_vmaf": target_vmaf,
             "vmaf_search_range": [vmaf_min, vmaf_max],
             "duplicate_frame_detection": dedup,
-            "duplicate_threshold": 0.001
+            "duplicate_threshold": 0.001,
+            "vmaf_model": vmaf_model
         },
         "audio": {
             "passthrough_codecs": passthrough_codecs,
@@ -489,6 +505,7 @@ async def api_create_job(
     target_vmaf: float = Form(0.0),
     vmaf_min: int = Form(18),
     vmaf_max: int = Form(30),
+    vmaf_model: str = Form("1080p"),
     dedup: bool = Form(False),
     passthrough_codecs: List[str] = Form([]),
     fallback_codec: str = Form("aac"),
@@ -508,14 +525,16 @@ async def api_create_job(
     is_customized = 0
     if original:
         orig_vid = original.get("video", {})
+        orig_opt = original.get("optimization", {})
         if (orig_vid.get("codec") != codec or
             str(orig_vid.get("preset")) != preset_val or
             orig_vid.get("crf") != crf or
             orig_vid.get("fps") != fps or
             orig_vid.get("fps_mode") != fps_mode or
             orig_vid.get("pixel_format") != pixel_format or
-            float(original.get("optimization", {}).get("target_vmaf", 0.0)) != target_vmaf or
-            bool(original.get("optimization", {}).get("duplicate_frame_detection", False)) != dedup or
+            float(orig_opt.get("target_vmaf", 0.0)) != target_vmaf or
+            orig_opt.get("vmaf_model", "1080p") != vmaf_model or
+            bool(orig_opt.get("duplicate_frame_detection", False)) != dedup or
             original.get("audio", {}).get("passthrough_codecs", []) != passthrough_codecs or
             original.get("subtitles", {}).get("mode", "none") != sub_mode):
             is_customized = 1
@@ -535,7 +554,8 @@ async def api_create_job(
             "target_vmaf": target_vmaf,
             "vmaf_search_range": [vmaf_min, vmaf_max],
             "duplicate_frame_detection": dedup,
-            "duplicate_threshold": 0.001
+            "duplicate_threshold": 0.001,
+            "vmaf_model": vmaf_model
         },
         "audio": {
             "passthrough_codecs": passthrough_codecs,
@@ -675,7 +695,7 @@ async def render_queues_fragment(request: Request) -> HTMLResponse:
         "normal_queue": normal_queue,
         "running": running,
         "history": completed + failed + cancelled,
-        "queue_paused": queue_paused
+        "queue_paused": is_queue_paused()
     })
 
 # API ENDPOINTS - SYSTEM SETTINGS
@@ -716,17 +736,31 @@ async def api_tool_dedup(request: Request, file_path: str = Form(...)):
     except Exception as e:
         return f"<div class='alert alert-danger'>Deduplication scan failed: {e}</div>"
 
-@app.post("/api/tools/vmaf", response_class=HTMLResponse)
-async def api_tool_vmaf(
+@app.post("/api/tools/vmaf-autocrf", response_class=HTMLResponse)
+async def api_tool_vmaf_autocrf(
     request: Request,
     file_path: str = Form(...),
+    vmaf_model: str = Form("1080p"),
     codec: str = Form(...),
-    preset: str = Form(...),
+    preset_val: str = Form(...),
     crf: int = Form(...),
+    visual_tune: int = Form(0),
+    fps: str = Form("same as source"),
+    fps_mode: str = Form("constant"),
     pixel_format: str = Form("yuv420p"),
-    dedup: bool = Form(False)
+    target_vmaf: float = Form(0.0),
+    vmaf_min: int = Form(18),
+    vmaf_max: int = Form(30),
+    dedup: bool = Form(False),
+    passthrough_codecs: List[str] = Form([]),
+    fallback_codec: str = Form("aac"),
+    fallback_bitrate: int = Form(192000),
+    sub_mode: str = Form("none"),
+    burn_in_track_select: str = Form("default"),
+    output_suffix: str = Form(""),
+    container: str = Form("mkv")
 ):
-    """Triggers VMAF scoring simulation on a sample segment of input."""
+    from app.engine import escape_filter_path
     p = Path(file_path)
     if not p.exists():
         return "<div class='alert alert-danger'>File not found.</div>"
@@ -735,53 +769,135 @@ async def api_tool_vmaf(
         meta = probe_video(p)
         duration = meta["duration"]
         
-        # Test CRF on midpoint 10s segment
-        ts = duration * 0.5
-        segment_duration = 10.0
-        
-        temp_out = TEMP_DIR / f"dryrun_vmaf_{int(time.time())}.mp4"
-        
-        # Setup test transcode
-        cmd = [
-            "ffmpeg", "-y",
-            "-ss", f"{ts:.3f}", "-t", f"{segment_duration:.3f}", "-i", str(p),
-            "-c:v", codec, "-crf", str(crf), "-preset", preset,
-            "-pix_fmt", pixel_format
-        ]
-        
+        # Prepare filters (e.g. mpdecimate)
         vf_filters = []
         if dedup:
-            vf_filters.append("mpdecimate")
-        if vf_filters:
-            cmd += ["-vf", ",".join(vf_filters)]
+            vf_filters.append("mpdecimate=max=0:hi=64:lo=64:frac=0.001")
             
-        cmd += ["-an", "-sn", str(temp_out)]
+        burn_in_track = None
+        if sub_mode == "burn-in":
+            tracks = meta["subtitles"]
+            if burn_in_track_select.isdigit():
+                burn_in_track_idx = int(burn_in_track_select)
+                burn_in_track = next((t for t in tracks if t["index"] == burn_in_track_idx), None)
+            elif burn_in_track_select == "forced":
+                burn_in_track = next((t for t in tracks if t["is_forced"]), None)
+            if not burn_in_track:
+                burn_in_track = next((t for t in tracks if t["is_default"]), None)
+                if not burn_in_track and tracks:
+                    burn_in_track = tracks[0]
+            
+            if burn_in_track:
+                t_codec = burn_in_track["codec"]
+                t_track_id = burn_in_track["track_id"]
+                if "pgs" in t_codec or "dvd" in t_codec or "vob" in t_codec:
+                    pass
+                else:
+                    escaped_input = escape_filter_path(p)
+                    vf_filters.append(f"subtitles='{escaped_input}':si={t_track_id}")
+                    
+        vf_string = ",".join(vf_filters) if vf_filters else None
         
-        # Run test transcode
-        subprocess.run(cmd, capture_output=True, check=True)
+        active_target_vmaf = target_vmaf if target_vmaf > 0 else 95.0
         
-        # Calculate size scaling estimates
-        in_segment_size = p.stat().st_size * (segment_duration / duration) if duration > 0 else 1
-        out_segment_size = temp_out.stat().st_size
-        size_scaling = int((out_segment_size / in_segment_size) * 100) if in_segment_size > 0 else 100
-        
-        # Compare VMAF
-        vmaf_score = run_vmaf_comparison(
-            ref_path=p,
-            dist_path=temp_out,
-            start_time=ts,
-            duration=segment_duration,
-            use_mpdecimate=dedup
+        optimal_crf = run_vmaf_search(
+            input_path=p,
+            codec=codec,
+            preset=preset_val,
+            pix_fmt=pixel_format,
+            filters=vf_string,
+            target_vmaf=active_target_vmaf,
+            crf_range=(vmaf_min, vmaf_max),
+            duration=duration,
+            use_mpdecimate=dedup,
+            model_type=vmaf_model
         )
         
-        # Clean up
-        if temp_out.exists():
-            temp_out.unlink()
-            
-        return templates.TemplateResponse(request, "components/tool_vmaf_result.html", {
-            "vmaf_score": vmaf_score,
-            "size_scaling": size_scaling,
-            "crf": crf
+        return templates.TemplateResponse(request, "components/tool_vmaf_autocrf_result.html", {
+            "optimal_crf": optimal_crf,
+            "target_vmaf": active_target_vmaf,
+            "codec": codec,
+            "preset": preset_val,
+            "vmaf_model": vmaf_model
         })
     except Exception as e:
-        return f"<div class='alert alert-danger'>VMAF scan failed: {e}</div>"
+        logger.error(f"VMAF Auto-CRF scan failed: {e}", exc_info=True)
+        return f"<div class='alert alert-danger'>VMAF Auto-CRF scan failed: {e}</div>"
+
+@app.post("/api/tools/vmaf-compare", response_class=HTMLResponse)
+async def api_tool_vmaf_compare(
+    request: Request,
+    ref_path: str = Form(...),
+    dist_path: str = Form(...),
+    vmaf_model: str = Form("1080p"),
+    compare_mode: str = Form("full"),
+    start_time: float = Form(0.0),
+    duration: float = Form(10.0),
+    dedup: bool = Form(False)
+):
+    ref_p = Path(ref_path)
+    dist_p = Path(dist_path)
+    if not ref_p.exists():
+        return "<div class='alert alert-danger'>Reference file not found.</div>"
+    if not dist_p.exists():
+        return "<div class='alert alert-danger'>Distorted file not found.</div>"
+        
+    try:
+        ref_meta = probe_video(ref_p)
+        ref_duration = ref_meta["duration"]
+        
+        if compare_mode == "full":
+            vmaf_score = run_vmaf_comparison(
+                ref_path=ref_p,
+                dist_path=dist_p,
+                start_time=0.0,
+                duration=ref_duration,
+                use_mpdecimate=dedup,
+                model_type=vmaf_model
+            )
+            vmaf_duration = ref_duration
+            vmaf_start = 0.0
+        elif compare_mode == "segment":
+            vmaf_score = run_vmaf_comparison(
+                ref_path=ref_p,
+                dist_path=dist_p,
+                start_time=start_time,
+                duration=duration,
+                use_mpdecimate=dedup,
+                model_type=vmaf_model
+            )
+            vmaf_duration = duration
+            vmaf_start = start_time
+        else: # sampled
+            timestamps = [ref_duration * 0.2, ref_duration * 0.5, ref_duration * 0.8]
+            timestamps = [t for t in timestamps if t + 10.0 < ref_duration]
+            if not timestamps:
+                timestamps = [0.0]
+                
+            scores = []
+            for ts in timestamps:
+                score = run_vmaf_comparison(
+                    ref_path=ref_p,
+                    dist_path=dist_p,
+                    start_time=ts,
+                    duration=10.0,
+                    use_mpdecimate=dedup,
+                    model_type=vmaf_model
+                )
+                scores.append(score)
+            vmaf_score = sum(scores) / len(scores) if scores else 0.0
+            vmaf_duration = len(timestamps) * 10.0
+            vmaf_start = None
+            
+        return templates.TemplateResponse(request, "components/tool_vmaf_compare_result.html", {
+            "vmaf_score": vmaf_score,
+            "vmaf_model": vmaf_model,
+            "compare_mode": compare_mode,
+            "vmaf_start": vmaf_start,
+            "vmaf_duration": vmaf_duration,
+            "ref_name": ref_p.name,
+            "dist_name": dist_p.name
+        })
+    except Exception as e:
+        logger.error(f"VMAF Comparison failed: {e}", exc_info=True)
+        return f"<div class='alert alert-danger'>VMAF Comparison failed: {e}</div>"

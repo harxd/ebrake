@@ -40,6 +40,9 @@
             Alpine.store('tools', {
                 active: 'dedup'
             });
+            Alpine.store('jobs', {
+                activeTab: 'priority'
+            });
         });
     </script>
     <script src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js" defer></script>
@@ -120,31 +123,34 @@
                 </li>
             </ul>
             
-            <!-- Quick-Snooze Toggle for Privacy Mode -->
-            <div class="privacy-toggle-wrapper" x-show="$store.privacy.active">
-                <button class="btn-privacy-toggle" 
-                        @click="$store.privacy.toggleSnooze()" 
-                        :class="{'snoozed': $store.privacy.snoozed}"
-                        title="Toggle Privacy Snooze">
-                    <i class="fa-solid" :class="$store.privacy.snoozed ? 'fa-eye-slash' : 'fa-eye'"></i>
-                    <span class="toggle-label" x-text="$store.privacy.snoozed ? 'Show Titles' : 'Blur Titles'"></span>
-                </button>
-            </div>
-            
-            <!-- Persistent Transcode Status in Sidebar -->
-            <div class="sidebar-status-panel" 
-                 hx-get="/api/jobs/poll-queues" 
-                 hx-trigger="every 3s" 
-                 hx-target="#queues-container"
-                 hx-swap="innerHTML">
-                <div class="status-inner">
-                    <div class="status-title">
-                        <i class="fa-solid fa-circle" id="status-engine-dot" style="color: {% if queue_paused %}var(--color-danger){% else %}var(--color-success){% endif %}; font-size: 8px;"></i>
-                        <span>Status Engine</span>
-                    </div>
-                    <div class="status-value" id="footer-status-indicator">
-                        <!-- Filled dynamically when queues update -->
-                        <span>Ready to Transcode</span>
+            <!-- Bottom Sidebar Group -->
+            <div class="sidebar-bottom-group">
+                <!-- Quick-Snooze Toggle for Privacy Mode -->
+                <div class="privacy-toggle-wrapper" x-show="$store.privacy.active">
+                    <button class="btn-privacy-toggle" 
+                            @click="$store.privacy.toggleSnooze()" 
+                            :class="{'snoozed': $store.privacy.snoozed}"
+                            title="Toggle Privacy Snooze">
+                        <i class="fa-solid" :class="$store.privacy.snoozed ? 'fa-eye-slash' : 'fa-eye'"></i>
+                        <span class="toggle-label" x-text="$store.privacy.snoozed ? 'Blur titles' : 'Show titles'"></span>
+                    </button>
+                </div>
+                
+                <!-- Persistent Transcode Status in Sidebar -->
+                <div class="sidebar-status-panel" 
+                     hx-get="/api/jobs/poll-queues" 
+                     hx-trigger="every 3s" 
+                     hx-target="#queues-container"
+                     hx-swap="innerHTML">
+                    <div class="status-inner">
+                        <div class="status-title">
+                            <i class="fa-solid fa-circle" id="status-engine-dot" style="color: {% if queue_paused %}{% if any_running %}var(--color-warning){% else %}var(--color-danger){% endif %}{% else %}var(--color-success){% endif %}; font-size: 8px;"></i>
+                            <span>Status Engine</span>
+                        </div>
+                        <div class="status-value" id="footer-status-indicator">
+                            <!-- Filled dynamically when queues update -->
+                            <span>Ready to Transcode</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -175,8 +181,11 @@
                         <button type="submit" form="dedup-form" class="btn btn-primary btn-large" id="tool-dedup-btn" x-show="$store.tools.active === 'dedup'" disabled>
                             <i class="fa-solid fa-square-poll-vertical"></i> Run Deduplication Scan
                         </button>
-                        <button type="submit" form="vmaf-form" class="btn btn-primary btn-large" id="tool-vmaf-btn" onclick="syncVmafFilePath()" x-show="$store.tools.active === 'vmaf'" style="display: none;" disabled>
-                            <i class="fa-solid fa-play"></i> Run VMAF Quality Scan
+                        <button type="submit" form="vmaf-autocrf-form" class="btn btn-primary btn-large" id="tool-vmaf-autocrf-btn" onclick="syncAutocrfFilePath()" x-show="$store.tools.active === 'vmaf_autocrf'" style="display: none;" disabled>
+                            <i class="fa-solid fa-play"></i> Run VMAF Auto-CRF Scan
+                        </button>
+                        <button type="submit" form="vmaf-compare-form" class="btn btn-primary btn-large" id="tool-vmaf-compare-btn" x-show="$store.tools.active === 'vmaf_compare'" style="display: none;" disabled>
+                            <i class="fa-solid fa-right-left"></i> Run VMAF Comparison
                         </button>
                     {% endif %}
                 </div>

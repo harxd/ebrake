@@ -38,7 +38,6 @@
 <script>
     function selectFile(path, name) {
         const inputField = document.getElementById('input_path_field');
-        const toolInputField = document.getElementById('tool_file_path_field');
         const selectedLabel = document.getElementById('selected_file_label');
         
         if (inputField) {
@@ -46,13 +45,41 @@
             const jobBtn = document.getElementById('job-submit-btn');
             if (jobBtn) jobBtn.removeAttribute('disabled');
         }
-        if (toolInputField) {
-            toolInputField.value = path;
-            const dedupBtn = document.getElementById('tool-dedup-btn');
-            const vmafBtn = document.getElementById('tool-vmaf-btn');
-            if (dedupBtn) dedupBtn.removeAttribute('disabled');
-            if (vmafBtn) vmafBtn.removeAttribute('disabled');
+        
+        if (window.activeFileInputId) {
+            const targetInput = document.getElementById(window.activeFileInputId);
+            if (targetInput) {
+                targetInput.value = path;
+                
+                // For VMAF Comparison, check if both reference and distorted are populated
+                const refVal = document.getElementById('tool_file_path_field_compare_ref').value;
+                const distVal = document.getElementById('tool_file_path_field_compare_dist').value;
+                const compareBtn = document.getElementById('tool-vmaf-compare-btn');
+                if (compareBtn) {
+                    if (refVal && distVal) {
+                        compareBtn.removeAttribute('disabled');
+                    } else {
+                        compareBtn.setAttribute('disabled', 'true');
+                    }
+                }
+            }
+        } else {
+            // General fallback tool input fields
+            const toolInputField = document.getElementById('tool_file_path_field');
+            if (toolInputField) {
+                toolInputField.value = path;
+                const dedupBtn = document.getElementById('tool-dedup-btn');
+                if (dedupBtn) dedupBtn.removeAttribute('disabled');
+            }
+            
+            const autocrfInput = document.getElementById('tool_file_path_field_autocrf');
+            if (autocrfInput) {
+                autocrfInput.value = path;
+                const autocrfBtn = document.getElementById('tool-vmaf-autocrf-btn');
+                if (autocrfBtn) autocrfBtn.removeAttribute('disabled');
+            }
         }
+        
         if (selectedLabel) {
             selectedLabel.innerText = name;
             selectedLabel.classList.remove('no-file');

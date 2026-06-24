@@ -25,4 +25,4 @@ burn_in_track_select = "default"
 
 [output]
 output_suffix = "-1080p-fast"
-container = "mp4"
+container = "mkv"

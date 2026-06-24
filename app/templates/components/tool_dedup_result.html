@@ -1,7 +1,7 @@
 <div class="result-card card glass-accent">
     <h4 class="result-title"><i class="fa-solid fa-square-poll-horizontal"></i> Scan Results</h4>
     
-    <div class="metrics-grid-3">
+    <div class="metrics-grid-2">
         <div class="metric-box">
             <span class="metric-label">Source FPS</span>
             <span class="metric-value text-primary">{{ results.source_fps | round(2) }}</span>
@@ -10,31 +10,6 @@
             <span class="metric-label">Unduplicated FPS</span>
             <span class="metric-value text-success">{{ results.unduplicated_fps | round(2) }}</span>
         </div>
-        <div class="metric-box">
-            <span class="metric-label">Space Savings (Est)</span>
-            <span class="metric-value text-accent">{{ results.saved_space_pct | round(1) }}%</span>
-        </div>
-    </div>
-    
-    <hr class="divider">
-    
-    <div class="stats-list">
-        <div class="stats-row">
-            <span>Total Source Frames:</span>
-            <strong>{{ results.total_frames }}</strong>
-        </div>
-        <div class="stats-row">
-            <span>Unique Frames:</span>
-            <strong>{{ results.unique_frames }}</strong>
-        </div>
-        <div class="stats-row">
-            <span>Dropped Duplicate Frames:</span>
-            <strong class="text-danger">{{ results.dropped_frames }}</strong>
-        </div>
-    </div>
-    
-    <div class="space-bar-wrapper">
-        <div class="space-bar-fill" style="width: {{ results.saved_space_pct }}%"></div>
-        <span class="space-bar-label">{{ results.saved_space_pct | round(1) }}% Duplicate frames eliminated</span>
     </div>
 </div>
+
