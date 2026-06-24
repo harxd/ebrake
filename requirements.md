@@ -712,10 +712,11 @@ document.addEventListener('alpine:init', () => {
 
 ## Verification & Testing
 
-To ensure the application operates correctly, two automated verification suites are available:
+To ensure the application operates correctly, three automated verification suites are available:
 
 1. **Lightweight Sanity Check (`verify.py`)**: A fast, dependency-free backend sanity check to test database storage, directory creation, default preset parser parsing, and basic queue sequencing without spawning any subprocesses or transcoding videos.
 2. **Robust Integration Suite (`verify_integration.py`)**: A full end-to-end integration suite that programmatically generates synthetic media files with repeated frames and subtitle tracks, runs actual `ffmpeg` and `ffprobe` processes in a sandboxed environment, tests transcoding pipelines, and simulates web API requests.
+3. **Playwright E2E Suite (`tests/`)**: A comprehensive Playwright and pytest-based UI testing suite that spawns a headless browser to test complete user flows.
 
 ### verify.py Capabilities
 
@@ -749,3 +750,27 @@ This script creates a sandboxed DB and app data space to execute complete integr
 - **FastAPI Web API Route Simulation**:
   - Mocks FastAPI Request objects to test `/api/settings` and `/api/media/search` endpoints and their HTMX templates rendering.
 - **Environment Cleanups**: Purges all intermediate assets and databases upon completion.
+
+### Playwright E2E Suite Capabilities
+
+The Playwright test suite (`tests/`) is the primary UI testing mechanism. It boots the FastAPI server locally and uses browser automation to verify **every single interactive element and workflow** of the application exhaustively.
+
+To support consistent, Git-compatible testing without relying on large external video files, the suite utilizes `scripts/generate_fixtures.py` to programmatically synthesize deterministic video assets (e.g., videos with exact known frame duplication rates or predictable VMAF scores) via `ffmpeg` before tests run.
+
+The suite enforces complete end-to-end coverage across the following domains:
+
+- **Presets Management (`tests/test_presets.py`)**: 
+  - Exhaustive testing of category creation, renaming, and deletion.
+  - Complete preset lifecycle: creating presets, editing all available configuration fields (video, audio, subtitle, output settings), and verifying the exact TOML payload persists.
+  - Validating drag-and-drop mechanics (moving presets between categories, handling name collisions, and confirming visual drag-over indicators).
+- **Transcoding Workflows (`tests/test_transcode.py`)**: 
+  - Simulating complete job submissions using various source files and preset combinations.
+  - Validating the Create Job UI interactions (file selection, preset overrides, button state reactivity based on selection).
+  - *(Note: Exhaustive verification of the "Jobs" dashboard and queue management is pending completion of the Jobs UI).*
+- **Tools Dashboard (`tests/test_tools.py`)**: 
+  - **FPS Deduplication Tool**: Tests scanning synthetic videos with known duplicate frame ratios to verify accurate detection and unduplicated FPS calculation.
+  - **VMAF Quality Simulator**: Tests scanning synthetic reference videos to ensure VMAF scores are accurately computed and displayed in the result dashboard.
+  - Validating that old test results are cleared dynamically when a new scan runs.
+- **Settings & Privacy (`tests/test_settings.py`)**: 
+  - Updating system path forms and startup recovery settings.
+  - Toggling Privacy Mode, ensuring that sensitive fields correctly apply CSS blur obfuscation and that the "snooze" functionality instantly de-blurs without persisting across sessions.

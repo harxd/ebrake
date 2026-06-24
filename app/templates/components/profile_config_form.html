@@ -24,7 +24,7 @@
     <hr class="divider">
     
     <!-- We leverage the exact same variables structure as overrides -->
-    {% set profile = profile | default({'video':{'codec':'libx264','preset':'fast','crf':22,'fps':'same as source','fps_mode':'constant','pixel_format':'yuv420p'},'optimization':{'target_vmaf':0.0,'vmaf_search_range':[18,30],'duplicate_frame_detection':false,'vmaf_model':'1080p'},'audio':{'passthrough_codecs':['aac','ac3'],'fallback_codec':'aac','fallback_bitrate':192000},'subtitles':{'mode':'none','burn_in_track_select':'default'},'output':{'output_suffix':'_transcoded','container':'mkv'}}) %}
+    {% set profile = profile | default({'video':{'codec':'libx264','preset':'fast','crf':22,'fps':'same as source','fps_mode':'constant','pixel_format':'yuv420p'},'optimization':{'target_vmaf':0.0,'vmaf_search_range':[18,30],'duplicate_frame_detection':false,'vmaf_model':'1080p'},'audio':{'passthrough_codecs':['aac','ac3'],'fallback_codec':'aac','fallback_bitrate':192000},'subtitles':{'mode':'none','burn_in_track_select':'default'},'output':{'output_suffix':'_transcoded','container':'mkv'}}, true) %}
     
     {% include "components/profile_overrides.html" %}
     
