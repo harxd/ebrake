@@ -273,19 +273,34 @@ def run_vmaf_comparison(
     
     model_param = get_vmaf_model_filter_param(model_type, video_width, video_height)
     
-    # We always use scale2ref to scale the distorted video ([1:v]) to reference video ([0:v])
-    filter_complex = ""
-    if use_mpdecimate:
-        filter_complex = (
-            f"[0:v]mpdecimate=max=0:hi=64:lo=64:frac={duplicate_threshold}[ref];"
-            f"[1:v][ref]scale2ref[dist_scaled][ref_out];"
-            f"[ref_out][dist_scaled]libvmaf={model_param}:log_fmt=json:log_path='{escaped_log}'"
-        )
+    # Determine target resolution based on the resolved model (Netflix guidelines)
+    if "vmaf_4k" in model_param:
+        tw, th = 3840, 2160
     else:
-        filter_complex = (
-            f"[1:v][0:v]scale2ref[dist_scaled][ref];"
-            f"[ref][dist_scaled]libvmaf={model_param}:log_fmt=json:log_path='{escaped_log}'"
-        )
+        tw, th = 1920, 1080
+        
+    # Scale streams to match target model resolution using bicubic upscaling if they differ
+    filters = []
+    ref_label = "[0:v]"
+    dist_label = "[1:v]"
+    
+    if use_mpdecimate:
+        filters.append(f"[0:v]mpdecimate=max=0:hi=64:lo=64:frac={duplicate_threshold}[ref_dec]")
+        ref_label = "[ref_dec]"
+        
+    if video_width != tw or video_height != th:
+        filters.append(f"{ref_label}scale={tw}:{th}:flags=bicubic[ref_scaled]")
+        filters.append(f"{dist_label}scale={tw}:{th}:flags=bicubic[dist_scaled]")
+        ref_label = "[ref_scaled]"
+        dist_label = "[dist_scaled]"
+    else:
+        # Fallback to scale2ref if dimensions already match target VMAF resolution
+        filters.append(f"{dist_label}{ref_label}scale2ref[dist_scaled][ref_out]")
+        ref_label = "[ref_out]"
+        dist_label = "[dist_scaled]"
+        
+    filters.append(f"{ref_label}{dist_label}libvmaf={model_param}:log_fmt=json:log_path='{escaped_log}'")
+    filter_complex = ";".join(filters)
         
     cmd = [
         "ffmpeg", "-y",
