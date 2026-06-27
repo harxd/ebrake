@@ -60,7 +60,7 @@
                     <div class="form-group">
                         <label>Preset Category</label>
                         <select name="category" class="form-control"
-                                hx-get="/api/profiles/presets-list" 
+                                hx-get="/api/presets/presets-list" 
                                 hx-target="#preset_select_autocrf"
                                 hx-trigger="change"
                                 onchange="loadAutocrfPresetFields()">
@@ -85,9 +85,9 @@
                     <h4 class="panel-title" style="font-size: 15px;"><i class="fa-solid fa-sliders"></i> Preset Overrides</h4>
                 </div>
                 
-                <div id="autocrf-profile-overrides-fields">
-                    {% if profile %}
-                        {% include "components/profile_overrides.html" %}
+                <div id="autocrf-preset-overrides-fields">
+                    {% if preset %}
+                        {% include "components/preset_overrides.html" %}
                     {% endif %}
                 </div>
                 
@@ -138,7 +138,9 @@
                     <div class="form-group">
                         <label>VMAF Model</label>
                         <select name="vmaf_model" class="form-control">
-                            <option value="1080p" selected>1080p (Standard / 3H)</option>
+                            <option value="auto_near" selected>Auto Near (Detect 4K)</option>
+                            <option value="auto_far">Auto Far (Detect 4K)</option>
+                            <option value="1080p">1080p (Standard / 3H)</option>
                             <option value="4k_near">4K Near (1.5H display height)</option>
                             <option value="4k_far">4K Far (3H display height / 1080p acuity)</option>
                         </select>
@@ -201,8 +203,8 @@
             const category = catSelect.value;
             const preset = preSelect.value;
             if (category && preset) {
-                htmx.ajax('GET', `/api/profiles/select?category=${encodeURIComponent(category)}&preset=${encodeURIComponent(preset)}`, {
-                    target: '#autocrf-profile-overrides-fields',
+                htmx.ajax('GET', `/api/presets/select?category=${encodeURIComponent(category)}&preset=${encodeURIComponent(preset)}`, {
+                    target: '#autocrf-preset-overrides-fields',
                     swap: 'innerHTML'
                 });
             }

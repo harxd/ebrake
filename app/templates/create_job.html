@@ -15,7 +15,7 @@
                 <div class="form-group">
                     <label>Preset Category</label>
                     <select name="category" class="form-control"
-                            hx-get="/api/profiles/presets-list" 
+                            hx-get="/api/presets/presets-list" 
                             hx-target="#preset_select"
                             hx-trigger="change"
                             onchange="loadPresetFields()">
@@ -58,9 +58,9 @@
                 <h4 class="panel-title" style="font-size: 15px;"><i class="fa-solid fa-sliders"></i> Preset Overrides</h4>
             </div>
             
-            <div id="profile-overrides-fields">
-                {% if profile %}
-                    {% include "components/profile_overrides.html" %}
+            <div id="preset-overrides-fields">
+                {% if preset %}
+                    {% include "components/preset_overrides.html" %}
                 {% endif %}
             </div>
             
@@ -88,8 +88,8 @@
             const preset = preSelect.value;
             if (category && preset) {
                 // Fetch the overrides content and replace the fields container
-                htmx.ajax('GET', `/api/profiles/select?category=${encodeURIComponent(category)}&preset=${encodeURIComponent(preset)}`, {
-                    target: '#profile-overrides-fields',
+                htmx.ajax('GET', `/api/presets/select?category=${encodeURIComponent(category)}&preset=${encodeURIComponent(preset)}`, {
+                    target: '#preset-overrides-fields',
                     swap: 'innerHTML'
                 });
             }

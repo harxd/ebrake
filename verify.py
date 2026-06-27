@@ -10,7 +10,7 @@ from app.database import (
     init_db, get_setting, set_setting, get_jobs, create_job, 
     add_to_transcode_next, start_next_job, delete_job
 )
-from app.profiles import init_profiles, list_categories, get_profile
+from app.presets import init_presets, list_categories, get_preset
 from app.scanner import run_library_sync
 
 def test_setup():
@@ -28,14 +28,14 @@ def test_setup():
     assert val == "test_val", f"Setting verify failed, got: {val}"
     print("[OK] Settings read/write successful.")
     
-    print("Testing default profiles creation...")
-    init_profiles()
+    print("Testing default presets creation...")
+    init_presets()
     categories = list_categories()
     assert "Default" in categories, f"Categories missing Default, got: {categories}"
-    profile = get_profile("Default", "AV1 VMAF Auto-CRF")
-    assert profile is not None, "Failed to load default AV1 profile!"
-    assert profile["video"]["codec"] == "libsvtav1", "Profile codec parsing mismatch!"
-    print("[OK] Profiles system functions correctly.")
+    preset = get_preset("Default", "AV1 VMAF Auto-CRF")
+    assert preset is not None, "Failed to load default AV1 preset!"
+    assert preset["video"]["codec"] == "libsvtav1", "Preset codec parsing mismatch!"
+    print("[OK] Presets system functions correctly.")
     
 def test_queues():
     print("Testing queue sorting and prioritization...")

@@ -49,7 +49,7 @@ def init_db():
             category TEXT,
             preset TEXT,
             is_customized BOOLEAN NOT NULL DEFAULT 0 CHECK(is_customized IN (0, 1)),
-            preset_config TEXT, -- JSON string containing final resolved profile params
+            preset_config TEXT, -- JSON string containing final resolved preset params
             subtitle_mode TEXT NOT NULL CHECK(subtitle_mode IN ('none', 'passthrough', 'burn-in')),
             selected_subtitle_track INTEGER,
             ffmpeg TEXT,

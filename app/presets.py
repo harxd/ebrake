@@ -3,22 +3,22 @@ import logging
 import shutil
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from app.config import PROFILES_DIR
+from app.config import PRESETS_DIR
 
 logger = logging.getLogger(__name__)
 
-def init_profiles():
-    """Ensure profiles directory has some basic starting presets if empty."""
-    PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+def init_presets():
+    """Ensure presets directory has some basic starting presets if empty."""
+    PRESETS_DIR.mkdir(parents=True, exist_ok=True)
     categories = list_categories()
     
-    if not categories or (len(categories) == 1 and not list_profiles(categories[0])):
-        # Empty profile list, create default category and profiles
-        default_cat = PROFILES_DIR / "Default"
+    if not categories or (len(categories) == 1 and not list_presets(categories[0])):
+        # Empty preset list, create default category and presets
+        default_cat = PRESETS_DIR / "Default"
         default_cat.mkdir(parents=True, exist_ok=True)
         
-        # AV1 High Quality profile
-        av1_profile = {
+        # AV1 High Quality preset
+        av1_preset = {
             "video": {
                 "codec": "libsvtav1",
                 "preset": "6",
@@ -50,8 +50,8 @@ def init_profiles():
             }
         }
         
-        # H.264 Fast 1080p profile
-        h264_profile = {
+        # H.264 Fast 1080p preset
+        h264_preset = {
             "video": {
                 "codec": "libx264",
                 "preset": "fast",
@@ -85,18 +85,18 @@ def init_profiles():
         
         try:
             with open(default_cat / "AV1 VMAF Auto-CRF.ebrake", "w") as f:
-                toml.dump(av1_profile, f)
+                toml.dump(av1_preset, f)
             with open(default_cat / "H264 1080p Fast.ebrake", "w") as f:
-                toml.dump(h264_profile, f)
-            logger.info("Initialized default profile templates.")
+                toml.dump(h264_preset, f)
+            logger.info("Initialized default preset templates.")
         except Exception as e:
-            logger.error(f"Failed to write default profiles: {e}")
+            logger.error(f"Failed to write default presets: {e}")
 
 def list_categories() -> List[str]:
-    """List category directory names under profiles folder."""
-    if not PROFILES_DIR.exists():
+    """List category directory names under presets folder."""
+    if not PRESETS_DIR.exists():
         return []
-    return [p.name for p in PROFILES_DIR.iterdir() if p.is_dir()]
+    return [p.name for p in PRESETS_DIR.iterdir() if p.is_dir()]
 
 def create_category(category_name: str) -> bool:
     """Create a new category directory."""
@@ -104,38 +104,38 @@ def create_category(category_name: str) -> bool:
     clean_name = Path(category_name).name
     if not clean_name:
         return False
-    cat_dir = PROFILES_DIR / clean_name
+    cat_dir = PRESETS_DIR / clean_name
     cat_dir.mkdir(parents=True, exist_ok=True)
     return True
 
 def delete_category(category_name: str) -> bool:
-    """Delete a category and its profiles recursive."""
+    """Delete a category and its presets recursive."""
     clean_name = Path(category_name).name
-    cat_dir = PROFILES_DIR / clean_name
+    cat_dir = PRESETS_DIR / clean_name
     if cat_dir.exists() and cat_dir.is_dir():
         shutil.rmtree(cat_dir)
         return True
     return False
 
-def list_profiles(category: str) -> List[str]:
-    """List profiles inside a specific category."""
+def list_presets(category: str) -> List[str]:
+    """List presets inside a specific category."""
     clean_cat = Path(category).name
-    cat_dir = PROFILES_DIR / clean_cat
+    cat_dir = PRESETS_DIR / clean_cat
     if not cat_dir.exists() or not cat_dir.is_dir():
         return []
     return [p.stem for p in cat_dir.glob("*.ebrake")]
 
-def get_profile(category: str, name: str) -> Optional[Dict[str, Any]]:
-    """Load and parse profile TOML configurations."""
+def get_preset(category: str, name: str) -> Optional[Dict[str, Any]]:
+    """Load and parse preset TOML configurations."""
     clean_cat = Path(category).name
     clean_name = Path(name).name
-    profile_path = PROFILES_DIR / clean_cat / f"{clean_name}.ebrake"
+    preset_path = PRESETS_DIR / clean_cat / f"{clean_name}.ebrake"
     
-    if not profile_path.exists():
+    if not preset_path.exists():
         return None
         
     try:
-        with open(profile_path, "r") as f:
+        with open(preset_path, "r") as f:
             data = toml.load(f)
             # Ensure standard sections exist to prevent UI crashes
             data.setdefault("video", {})
@@ -145,42 +145,42 @@ def get_profile(category: str, name: str) -> Optional[Dict[str, Any]]:
             data.setdefault("output", {})
             return data
     except Exception as e:
-        logger.error(f"Error reading profile TOML: {e}")
+        logger.error(f"Error reading preset TOML: {e}")
         return None
 
-def save_profile(category: str, name: str, profile_data: Dict[str, Any]) -> bool:
-    """Save a profile configurations as TOML."""
+def save_preset(category: str, name: str, preset_data: Dict[str, Any]) -> bool:
+    """Save a preset configurations as TOML."""
     clean_cat = Path(category).name
     # Strip `.ebrake` if included in name
     clean_name = Path(name).stem
     
-    cat_dir = PROFILES_DIR / clean_cat
+    cat_dir = PRESETS_DIR / clean_cat
     if not cat_dir.exists() or not cat_dir.is_dir():
         return False
         
-    profile_path = cat_dir / f"{clean_name}.ebrake"
+    preset_path = cat_dir / f"{clean_name}.ebrake"
     try:
-        with open(profile_path, "w") as f:
-            toml.dump(profile_data, f)
+        with open(preset_path, "w") as f:
+            toml.dump(preset_data, f)
         return True
     except Exception as e:
-        logger.error(f"Error saving profile TOML: {e}")
+        logger.error(f"Error saving preset TOML: {e}")
         return False
 
-def delete_profile(category: str, name: str) -> bool:
-    """Delete a profile `.ebrake` file."""
+def delete_preset(category: str, name: str) -> bool:
+    """Delete a preset `.ebrake` file."""
     clean_cat = Path(category).name
     clean_name = Path(name).name
-    profile_path = PROFILES_DIR / clean_cat / f"{clean_name}.ebrake"
+    preset_path = PRESETS_DIR / clean_cat / f"{clean_name}.ebrake"
     
-    if profile_path.exists():
-        profile_path.unlink()
+    if preset_path.exists():
+        preset_path.unlink()
         return True
     return False
 
-def get_all_profiles() -> Dict[str, List[str]]:
-    """Return dictionary of categories with their profiles list."""
+def get_all_presets() -> Dict[str, List[str]]:
+    """Return dictionary of categories with their presets list."""
     result = {}
     for cat in list_categories():
-        result[cat] = list_profiles(cat)
+        result[cat] = list_presets(cat)
     return result

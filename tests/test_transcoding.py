@@ -16,8 +16,9 @@ def test_basic_transcoding(page: Page, server_url: str):
     # Wait for the right pane to populate with config for this file
     expect(page.locator('h4:has-text("Preset Overrides")')).to_be_visible()
     
-    # Select H264 profile
+    # Select H264 preset
     page.select_option('select[name="category"]', 'Default')
+    page.wait_for_selector('select[name="preset"] option[value="H264 1080p Fast"]', state="attached")
     page.select_option('select[name="preset"]', 'H264 1080p Fast')
     
     # Ensure button is enabled and click Start Transcode

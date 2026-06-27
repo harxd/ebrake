@@ -1,7 +1,7 @@
-<form id="profile-config-form" hx-post="/api/profiles/save" hx-target="#profile-save-status"
-      oninput="document.getElementById('profile-save-btn').removeAttribute('disabled')"
-      onchange="document.getElementById('profile-save-btn').removeAttribute('disabled')"
-      hx-on::after-request="if (event.detail.successful && !event.detail.xhr.responseText.includes('alert-danger')) flashSaveSuccess('profile-save-btn')">
+<form id="preset-config-form" hx-post="/api/presets/save" hx-target="#preset-save-status"
+      oninput="document.getElementById('preset-save-btn').removeAttribute('disabled')"
+      onchange="document.getElementById('preset-save-btn').removeAttribute('disabled')"
+      hx-on::after-request="if (event.detail.successful && !event.detail.xhr.responseText.includes('alert-danger')) flashSaveSuccess('preset-save-btn')">
     
     <div class="panel-header-row">
         <h3 class="panel-title">
@@ -10,7 +10,7 @@
         </h3>
     </div>
     
-    <div id="profile-save-status"></div>
+    <div id="preset-save-status"></div>
     
     <!-- Hidden Category and Name settings -->
     <input type="hidden" name="category" value="{{ category }}">
@@ -24,16 +24,16 @@
     <hr class="divider">
     
     <!-- We leverage the exact same variables structure as overrides -->
-    {% set profile = profile | default({'video':{'codec':'libx264','preset':'fast','crf':22,'fps':'same as source','fps_mode':'constant','pixel_format':'yuv420p'},'optimization':{'target_vmaf':0.0,'vmaf_search_range':[18,30],'duplicate_frame_detection':false,'vmaf_model':'1080p'},'audio':{'passthrough_codecs':['aac','ac3'],'fallback_codec':'aac','fallback_bitrate':192000},'subtitles':{'mode':'none','burn_in_track_select':'default'},'output':{'output_suffix':'_transcoded','container':'mkv'}}, true) %}
+    {% set preset = preset | default({'video':{'codec':'libx264','preset':'fast','crf':22,'fps':'same as source','fps_mode':'constant','pixel_format':'yuv420p'},'optimization':{'target_vmaf':0.0,'vmaf_search_range':[18,30],'duplicate_frame_detection':false,'vmaf_model':'1080p'},'audio':{'passthrough_codecs':['aac','ac3'],'fallback_codec':'aac','fallback_bitrate':192000},'subtitles':{'mode':'none','burn_in_track_select':'default'},'output':{'output_suffix':'_transcoded','container':'mkv'}}, true) %}
     
-    {% include "components/profile_overrides.html" %}
+    {% include "components/preset_overrides.html" %}
     
 </form>
-
+    
 {% if request.headers.get("HX-Request") == "true" %}
 <!-- Swap disabled save button into the permanent page action bar -->
 <div class="action-bar" id="page-action-bar" hx-swap-oob="true">
-    <button type="submit" form="profile-config-form" class="btn btn-primary btn-large" id="profile-save-btn" disabled>
+    <button type="submit" form="preset-config-form" class="btn btn-primary btn-large" id="preset-save-btn" disabled>
         <i class="fa-solid fa-save"></i> Save Preset
     </button>
 </div>
@@ -41,6 +41,6 @@
 
 {% if just_renamed %}
 <script>
-    flashSaveSuccess('profile-save-btn');
+    flashSaveSuccess('preset-save-btn');
 </script>
 {% endif %}

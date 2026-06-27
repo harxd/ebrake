@@ -65,7 +65,7 @@ def probe_video(file_path: Path) -> Dict[str, Any]:
     cmd_video = [
         "ffprobe", "-v", "error",
         "-select_streams", "v:0",
-        "-show_entries", "stream=avg_frame_rate,duration,nb_frames,pix_fmt",
+        "-show_entries", "stream=avg_frame_rate,duration,nb_frames,pix_fmt,width,height",
         "-of", "json", str(file_path)
     ]
     
@@ -118,6 +118,8 @@ def probe_video(file_path: Path) -> Dict[str, Any]:
         
     nb_frames = int(v_stream.get("nb_frames")) if v_stream.get("nb_frames") else 0
     pix_fmt = v_stream.get("pix_fmt", "yuv420p")
+    width = int(v_stream.get("width")) if v_stream.get("width") else 1920
+    height = int(v_stream.get("height")) if v_stream.get("height") else 1080
 
     # Parse subtitle tracks data
     sub_tracks = []
@@ -138,6 +140,8 @@ def probe_video(file_path: Path) -> Dict[str, Any]:
         "fps": fps_val,
         "nb_frames": nb_frames,
         "pix_fmt": pix_fmt,
+        "width": width,
+        "height": height,
         "subtitles": sub_tracks
     }
 
@@ -228,8 +232,15 @@ def run_dedup_dryrun(file_path: Path) -> Dict[str, Any]:
         "saved_space_pct": saved_space_pct
     }
 
-def get_vmaf_model_filter_param(model_type: str) -> str:
+def get_vmaf_model_filter_param(model_type: str, width: int = 1920, height: int = 1080) -> str:
     """Resolves VMAF model path or built-in version string based on type."""
+    if model_type in ("auto_near", "auto_far"):
+        is_4k = (width > 1920 or height > 1080)
+        if model_type == "auto_near":
+            model_type = "4k_near" if is_4k else "1080p"
+        else:
+            model_type = "4k_far" if is_4k else "1080p"
+
     if model_type == "4k_near":
         path = Path("/usr/share/model/vmaf_4k_v0.6.1.json")
         if path.exists():
@@ -248,7 +259,9 @@ def run_vmaf_comparison(
     duration: float, 
     use_mpdecimate: bool, 
     duplicate_threshold: float = 0.001,
-    model_type: str = "1080p"
+    model_type: str = "1080p",
+    video_width: int = 1920,
+    video_height: int = 1080
 ) -> float:
     """
     Computes VMAF on segment samples.
@@ -258,7 +271,7 @@ def run_vmaf_comparison(
     log_file = TEMP_DIR / f"vmaf_{int(time.time() * 1000)}.json"
     escaped_log = escape_filter_path(log_file)
     
-    model_param = get_vmaf_model_filter_param(model_type)
+    model_param = get_vmaf_model_filter_param(model_type, video_width, video_height)
     
     # We always use scale2ref to scale the distorted video ([1:v]) to reference video ([0:v])
     filter_complex = ""
@@ -319,7 +332,9 @@ def run_vmaf_search(
     duration: float,
     use_mpdecimate: bool,
     duplicate_threshold: float = 0.001,
-    model_type: str = "1080p"
+    model_type: str = "1080p",
+    video_width: int = 1920,
+    video_height: int = 1080
 ) -> int:
     """
     Performs Binary Search optimization to find the CRF that yields target VMAF.
@@ -378,7 +393,9 @@ def run_vmaf_search(
                     duration=segment_duration,
                     use_mpdecimate=use_mpdecimate,
                     duplicate_threshold=duplicate_threshold,
-                    model_type=model_type
+                    model_type=model_type,
+                    video_width=video_width,
+                    video_height=video_height
                 )
                 scores.append(score)
             except Exception as e:
@@ -499,7 +516,10 @@ def transcode_video(job_id: int):
             crf_range=tuple(crf_range),
             duration=duration,
             use_mpdecimate=dedup,
-            duplicate_threshold=opt_cfg.get("duplicate_threshold", 0.001)
+            duplicate_threshold=opt_cfg.get("duplicate_threshold", 0.001),
+            model_type=opt_cfg.get("vmaf_model", "1080p"),
+            video_width=meta.get("width", 1920),
+            video_height=meta.get("height", 1080)
         )
         update_job(job_id, selected_crf=crf)
     else:
@@ -716,7 +736,10 @@ def transcode_video(job_id: int):
                         start_time=vmaf_sample_start,
                         duration=vmaf_sample_len,
                         use_mpdecimate=dedup,
-                        duplicate_threshold=opt_cfg.get("duplicate_threshold", 0.001)
+                        duplicate_threshold=opt_cfg.get("duplicate_threshold", 0.001),
+                        model_type=opt_cfg.get("vmaf_model", "1080p"),
+                        video_width=meta.get("width", 1920),
+                        video_height=meta.get("height", 1080)
                     )
                     logger.info(f"Final measured VMAF: {measured_vmaf}")
                 except Exception as ex:

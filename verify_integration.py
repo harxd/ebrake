@@ -25,7 +25,7 @@ from app.database import (
     init_db, get_jobs, get_job, create_job, delete_job,
     get_setting, set_setting, add_to_transcode_next, start_next_job
 )
-from app.profiles import init_profiles, get_profile
+from app.presets import init_presets, get_preset
 from app.scanner import run_library_sync
 from app.engine import (
     transcode_video, run_dedup_dryrun, run_vmaf_search, probe_video,
@@ -117,10 +117,10 @@ def test_setup_and_init():
     assert get_setting("privacy_mode_enabled") is True, "Settings storage check failed!"
     
     print("Testing profile preset generation...")
-    init_profiles()
-    profile = get_profile("Default", "AV1 VMAF Auto-CRF")
-    assert profile is not None, "Failed to load default profiles!"
-    assert profile["video"]["codec"] == "libsvtav1", "Profile codec parsing error!"
+    init_presets()
+    preset = get_preset("Default", "AV1 VMAF Auto-CRF")
+    assert preset is not None, "Failed to load default presets!"
+    assert preset["video"]["codec"] == "libsvtav1", "Preset codec parsing error!"
     print("[SUCCESS] Phase 1 checks passed successfully.")
 
 def test_queues_and_reordering():
@@ -171,7 +171,7 @@ def test_transcode_pipeline(input_file: Path):
     
     # 1. Test standard H264 transcode
     print("Testing basic H.264 transcoding...")
-    h264_profile = get_profile("Default", "H264 1080p Fast")
+    h264_preset = get_preset("Default", "H264 1080p Fast")
     
     job_h264 = create_job({
         "status": "pending",
@@ -180,7 +180,7 @@ def test_transcode_pipeline(input_file: Path):
         "priority": 0,
         "category": "Default",
         "preset": "H264 1080p Fast",
-        "preset_config": json.dumps(h264_profile),
+        "preset_config": json.dumps(h264_preset),
         "subtitle_mode": "none"
     })
     
@@ -195,10 +195,10 @@ def test_transcode_pipeline(input_file: Path):
     
     # 2. Test Duplicate Frame Detection
     print("\nTesting Duplicate Frame Detection (mpdecimate)...")
-    dedup_profile = get_profile("Default", "AV1 VMAF Auto-CRF")
-    dedup_profile["optimization"]["duplicate_frame_detection"] = True
-    dedup_profile["optimization"]["target_vmaf"] = 0.0  # disable VMAF for this run
-    dedup_profile["video"]["crf"] = 28 # fixed crf
+    dedup_preset = get_preset("Default", "AV1 VMAF Auto-CRF")
+    dedup_preset["optimization"]["duplicate_frame_detection"] = True
+    dedup_preset["optimization"]["target_vmaf"] = 0.0  # disable VMAF for this run
+    dedup_preset["video"]["crf"] = 28 # fixed crf
     
     job_dedup = create_job({
         "status": "pending",
@@ -207,7 +207,7 @@ def test_transcode_pipeline(input_file: Path):
         "priority": 0,
         "category": "Default",
         "preset": "AV1 VMAF Auto-CRF",
-        "preset_config": json.dumps(dedup_profile),
+        "preset_config": json.dumps(dedup_preset),
         "subtitle_mode": "none"
     })
     
@@ -227,10 +227,10 @@ def test_transcode_pipeline(input_file: Path):
     has_vmaf = check_ffmpeg_vmaf()
     if has_vmaf:
         print("\nTesting VMAF Auto-CRF Search...")
-        vmaf_profile = get_profile("Default", "AV1 VMAF Auto-CRF")
-        vmaf_profile["optimization"]["target_vmaf"] = 93.0
-        vmaf_profile["optimization"]["vmaf_search_range"] = [22, 32]
-        vmaf_profile["optimization"]["duplicate_frame_detection"] = False
+        vmaf_preset = get_preset("Default", "AV1 VMAF Auto-CRF")
+        vmaf_preset["optimization"]["target_vmaf"] = 93.0
+        vmaf_preset["optimization"]["vmaf_search_range"] = [22, 32]
+        vmaf_preset["optimization"]["duplicate_frame_detection"] = False
         
         job_vmaf = create_job({
             "status": "pending",
@@ -239,7 +239,7 @@ def test_transcode_pipeline(input_file: Path):
             "priority": 0,
             "category": "Default",
             "preset": "AV1 VMAF Auto-CRF",
-            "preset_config": json.dumps(vmaf_profile),
+            "preset_config": json.dumps(vmaf_preset),
             "subtitle_mode": "none"
         })
         
@@ -256,9 +256,9 @@ def test_transcode_pipeline(input_file: Path):
 
     # 4. Test Subtitle Burn-In
     print("\nTesting Subtitle Burn-In...")
-    sub_profile = get_profile("Default", "H264 1080p Fast")
-    sub_profile["subtitles"]["mode"] = "burn-in"
-    sub_profile["subtitles"]["burn_in_track_select"] = "default"
+    sub_preset = get_preset("Default", "H264 1080p Fast")
+    sub_preset["subtitles"]["mode"] = "burn-in"
+    sub_preset["subtitles"]["burn_in_track_select"] = "default"
     
     job_subs = create_job({
         "status": "pending",
@@ -267,7 +267,7 @@ def test_transcode_pipeline(input_file: Path):
         "priority": 0,
         "category": "Default",
         "preset": "H264 1080p Fast",
-        "preset_config": json.dumps(sub_profile),
+        "preset_config": json.dumps(sub_preset),
         "subtitle_mode": "burn-in"
     })
     

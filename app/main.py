@@ -11,16 +11,16 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from app.config import init_directories, PROFILES_DIR, MEDIA_DIR
+from app.config import init_directories, PRESETS_DIR, MEDIA_DIR
 from app.database import (
     init_db, get_jobs, get_job, create_job, update_job, delete_job,
     get_setting, set_setting, get_media_files, search_media_files,
     add_to_transcode_next, insert_into_transcode_next, reorder_transcode_next,
     remove_from_transcode_next
 )
-from app.profiles import (
-    init_profiles, get_all_profiles, get_profile, save_profile,
-    delete_profile, create_category, delete_category, list_categories, list_profiles
+from app.presets import (
+    init_presets, get_all_presets, get_preset, save_preset,
+    delete_preset, create_category, delete_category, list_categories, list_presets
 )
 from app.scanner import run_library_sync, start_periodic_scanner, is_library_syncing
 from app.engine import (
@@ -39,8 +39,8 @@ async def lifespan(app: FastAPI):
     init_directories()
     # Initialize SQLite database schema
     init_db()
-    # Populate profile templates if empty
-    init_profiles()
+    # Populate preset templates if empty
+    init_presets()
     # Recover orphaned transcoding processes
     recover_orphaned_jobs()
     # Start background transcoding thread
@@ -99,25 +99,25 @@ async def index(request: Request):
 
 @app.get("/create-job", response_class=HTMLResponse)
 async def create_job_page(request: Request):
-    profiles_tree = get_all_profiles()
+    presets_tree = get_all_presets()
     categories = list_categories()
     
-    # Load first category profiles as default listing
+    # Load first category presets as default listing
     default_category = categories[0] if categories else ""
-    default_presets = list_profiles(default_category) if default_category else []
+    default_presets = list_presets(default_category) if default_category else []
     
     # Load parameters for the first preset if exists
-    default_profile_data = None
+    default_preset_data = None
     if default_category and default_presets:
-        default_profile_data = get_profile(default_category, default_presets[0])
+        default_preset_data = get_preset(default_category, default_presets[0])
         
     context = {
         "active_tab": "create-job",
-        "profiles_tree": profiles_tree,
+        "presets_tree": presets_tree,
         "categories": categories,
         "current_category": default_category,
         "presets": default_presets,
-        "profile": default_profile_data,
+        "preset": default_preset_data,
         "media_root": str(MEDIA_DIR)
     }
     return render_page(request, "create_job.html", context)
@@ -145,33 +145,33 @@ async def jobs_page(request: Request):
     }
     return render_page(request, "jobs.html", context)
 
-@app.get("/profiles", response_class=HTMLResponse)
-async def profiles_page(request: Request):
-    profiles_tree = get_all_profiles()
+@app.get("/presets", response_class=HTMLResponse)
+async def presets_page(request: Request):
+    presets_tree = get_all_presets()
     categories = list_categories()
     
     context = {
-        "active_tab": "profiles",
-        "profiles_tree": profiles_tree,
+        "active_tab": "presets",
+        "presets_tree": presets_tree,
         "categories": categories
     }
-    return render_page(request, "profiles.html", context)
+    return render_page(request, "presets.html", context)
 
 @app.get("/tools", response_class=HTMLResponse)
 async def tools_page(request: Request):
     categories = list_categories()
     default_category = categories[0] if categories else ""
-    default_presets = list_profiles(default_category) if default_category else []
+    default_presets = list_presets(default_category) if default_category else []
     
-    default_profile_data = None
+    default_preset_data = None
     if default_category and default_presets:
-        default_profile_data = get_profile(default_category, default_presets[0])
+        default_preset_data = get_preset(default_category, default_presets[0])
         
     context = {
         "active_tab": "tools",
         "categories": categories,
         "presets": default_presets,
-        "profile": default_profile_data,
+        "preset": default_preset_data,
         "media_root": str(MEDIA_DIR)
     }
     return render_page(request, "tools.html", context)
@@ -299,37 +299,37 @@ async def api_media_sync_reset(request: Request):
     </button>
     """
 
-# API ENDPOINTS - PROFILES MANAGEMENT
+# API ENDPOINTS - PRESETS MANAGEMENT
 
-@app.get("/api/profiles/select", response_class=HTMLResponse)
-async def api_profile_select_preset(request: Request, category: str, preset: str):
+@app.get("/api/presets/select", response_class=HTMLResponse)
+async def api_preset_select_preset(request: Request, category: str, preset: str):
     """Loads a preset details configurations to pre-populate configuration overrides panel."""
-    profile_data = get_profile(category, preset)
-    if not profile_data:
-        raise HTTPException(status_code=404, detail="Preset profile not found")
+    preset_data = get_preset(category, preset)
+    if not preset_data:
+        raise HTTPException(status_code=404, detail="Preset not found")
         
-    return templates.TemplateResponse(request, "components/profile_overrides.html", {
-        "profile": profile_data
+    return templates.TemplateResponse(request, "components/preset_overrides.html", {
+        "preset": preset_data
     })
 
-@app.get("/api/profiles/presets-list", response_class=HTMLResponse)
-async def api_profiles_list_presets(request: Request, category: str):
+@app.get("/api/presets/presets-list", response_class=HTMLResponse)
+async def api_presets_list_presets(request: Request, category: str):
     """Fetches list of presets inside a category."""
-    presets = list_profiles(category)
+    presets = list_presets(category)
     return "".join([f"<option value='{p}'>{p}</option>" for p in presets])
 
-@app.get("/api/profiles/config-fields", response_class=HTMLResponse)
-async def api_profile_config_fields(request: Request, category: str, name: Optional[str] = None):
-    """Returns a full preset config form for editing inside Profiles tab."""
-    profile_data = get_profile(category, name) if name else None
-    return templates.TemplateResponse(request, "components/profile_config_form.html", {
+@app.get("/api/presets/config-fields", response_class=HTMLResponse)
+async def api_preset_config_fields(request: Request, category: str, name: Optional[str] = None):
+    """Returns a full preset config form for editing inside Presets tab."""
+    preset_data = get_preset(category, name) if name else None
+    return templates.TemplateResponse(request, "components/preset_config_form.html", {
         "category": category,
         "preset_name": name,
-        "profile": profile_data
+        "preset": preset_data
     })
 
-@app.post("/api/profiles/save", response_class=HTMLResponse)
-async def api_profile_save(
+@app.post("/api/presets/save", response_class=HTMLResponse)
+async def api_preset_save(
     request: Request,
     category: str = Form(...),
     preset_name: str = Form(...),
@@ -358,14 +358,14 @@ async def api_profile_save(
     # Collision check
     rename_occurred = False
     if original_preset_name and original_preset_name != preset_name:
-        existing = get_profile(category, preset_name)
+        existing = get_preset(category, preset_name)
         if existing:
             response_html = f"<div class='alert alert-danger'>A preset named '{preset_name}' already exists in category '{category}'.</div>"
             return HTMLResponse(content=response_html)
         rename_occurred = True
 
-    # Build profile structure
-    profile_data = {
+    # Build preset structure
+    preset_data = {
         "video": {
             "codec": codec,
             "preset": preset_val,
@@ -398,69 +398,69 @@ async def api_profile_save(
         }
     }
     
-    success = save_profile(category, preset_name, profile_data)
+    success = save_preset(category, preset_name, preset_data)
     
-    # If rename was successful, delete the old preset BEFORE listing profiles for tree reload
+    # If rename was successful, delete the old preset BEFORE listing presets for tree reload
     if success and rename_occurred:
-        delete_profile(category, original_preset_name)
+        delete_preset(category, original_preset_name)
     
     # Return HTML message + reload categories tree
     response_html = ""
     # Trigger categories out-of-band updates
-    tree_html = templates.TemplateResponse(request, "components/profiles_tree.html", {
-        "profiles_tree": get_all_profiles(),
+    tree_html = templates.TemplateResponse(request, "components/presets_tree.html", {
+        "presets_tree": get_all_presets(),
         "categories": list_categories()
     }).body.decode()
-    response_html += f"<div id='profiles-tree-root' hx-swap-oob='true'>{tree_html}</div>"
+    response_html += f"<div id='presets-tree-root' hx-swap-oob='true'>{tree_html}</div>"
     
     if success and rename_occurred:
-        form_html = templates.TemplateResponse(request, "components/profile_config_form.html", {
+        form_html = templates.TemplateResponse(request, "components/preset_config_form.html", {
             "category": category,
             "preset_name": preset_name,
-            "profile": profile_data,
+            "preset": preset_data,
             "just_renamed": True
         }).body.decode()
-        response_html += f"<div id='profile-config-container' class='panel card glass' hx-swap-oob='true'>{form_html}</div>"
+        response_html += f"<div id='preset-config-container' class='panel card glass' hx-swap-oob='true'>{form_html}</div>"
         
-    return HTMLResponse(content=response_html, headers={"HX-Trigger": "profileChanged"})
+    return HTMLResponse(content=response_html, headers={"HX-Trigger": "presetChanged"})
 
-@app.post("/api/profiles/category/create", response_class=HTMLResponse)
+@app.post("/api/presets/category/create", response_class=HTMLResponse)
 async def api_create_category(request: Request, name: str = Form(...)):
     """Create new category folder."""
     create_category(name)
-    return templates.TemplateResponse(request, "components/profiles_tree.html", {
-        "profiles_tree": get_all_profiles(),
+    return templates.TemplateResponse(request, "components/presets_tree.html", {
+        "presets_tree": get_all_presets(),
         "categories": list_categories()
     })
 
-@app.delete("/api/profiles/category/{name}", response_class=HTMLResponse)
+@app.delete("/api/presets/category/{name}", response_class=HTMLResponse)
 async def api_delete_category(request: Request, name: str):
-    """Delete a profile category folder recursively."""
+    """Delete a preset category folder recursively."""
     delete_category(name)
-    return templates.TemplateResponse(request, "components/profiles_tree.html", {
-        "profiles_tree": get_all_profiles(),
+    return templates.TemplateResponse(request, "components/presets_tree.html", {
+        "presets_tree": get_all_presets(),
         "categories": list_categories()
     })
 
-@app.delete("/api/profiles/{category}/{name}", response_class=HTMLResponse)
-async def api_delete_profile(request: Request, category: str, name: str):
+@app.delete("/api/presets/{category}/{name}", response_class=HTMLResponse)
+async def api_delete_preset(request: Request, category: str, name: str):
     """Delete preset .ebrake file."""
-    delete_profile(category, name)
-    return templates.TemplateResponse(request, "components/profiles_tree.html", {
-        "profiles_tree": get_all_profiles(),
+    delete_preset(category, name)
+    return templates.TemplateResponse(request, "components/presets_tree.html", {
+        "presets_tree": get_all_presets(),
         "categories": list_categories()
     })
 
-@app.post("/api/profiles/move", response_class=HTMLResponse)
-async def api_profile_move(
+@app.post("/api/presets/move", response_class=HTMLResponse)
+async def api_preset_move(
     request: Request,
     preset_name: str = Form(...),
     from_category: str = Form(...),
     to_category: str = Form(...)
 ):
     """Move preset file from one category directory to another."""
-    from_path = PROFILES_DIR / from_category / f"{preset_name}.ebrake"
-    to_path = PROFILES_DIR / to_category / f"{preset_name}.ebrake"
+    from_path = PRESETS_DIR / from_category / f"{preset_name}.ebrake"
+    to_path = PRESETS_DIR / to_category / f"{preset_name}.ebrake"
     
     headers = {}
     if not from_path.exists():
@@ -475,8 +475,8 @@ async def api_profile_move(
             headers["HX-Trigger"] = json.dumps({"presetMoveCollision": f"System error moving preset: {e}"})
             
     # Always return tree HTML so the list remains valid and updates
-    tree_html = templates.TemplateResponse(request, "components/profiles_tree.html", {
-        "profiles_tree": get_all_profiles(),
+    tree_html = templates.TemplateResponse(request, "components/presets_tree.html", {
+        "presets_tree": get_all_presets(),
         "categories": list_categories()
     })
     
@@ -520,8 +520,8 @@ async def api_create_job(
     if not in_file.exists():
         raise HTTPException(status_code=400, detail="Input file does not exist.")
         
-    # Check is_customized comparison with original profile values
-    original = get_profile(category, preset)
+    # Check is_customized comparison with original preset values
+    original = get_preset(category, preset)
     is_customized = 0
     if original:
         orig_vid = original.get("video", {})
@@ -810,7 +810,9 @@ async def api_tool_vmaf_autocrf(
             crf_range=(vmaf_min, vmaf_max),
             duration=duration,
             use_mpdecimate=dedup,
-            model_type=vmaf_model
+            model_type=vmaf_model,
+            video_width=meta.get("width", 1920),
+            video_height=meta.get("height", 1080)
         )
         
         return templates.TemplateResponse(request, "components/tool_vmaf_autocrf_result.html", {
@@ -853,7 +855,9 @@ async def api_tool_vmaf_compare(
                 start_time=0.0,
                 duration=ref_duration,
                 use_mpdecimate=dedup,
-                model_type=vmaf_model
+                model_type=vmaf_model,
+                video_width=ref_meta.get("width", 1920),
+                video_height=ref_meta.get("height", 1080)
             )
             vmaf_duration = ref_duration
             vmaf_start = 0.0
@@ -864,7 +868,9 @@ async def api_tool_vmaf_compare(
                 start_time=start_time,
                 duration=duration,
                 use_mpdecimate=dedup,
-                model_type=vmaf_model
+                model_type=vmaf_model,
+                video_width=ref_meta.get("width", 1920),
+                video_height=ref_meta.get("height", 1080)
             )
             vmaf_duration = duration
             vmaf_start = start_time
@@ -882,7 +888,9 @@ async def api_tool_vmaf_compare(
                     start_time=ts,
                     duration=10.0,
                     use_mpdecimate=dedup,
-                    model_type=vmaf_model
+                    model_type=vmaf_model,
+                    video_width=ref_meta.get("width", 1920),
+                    video_height=ref_meta.get("height", 1080)
                 )
                 scores.append(score)
             vmaf_score = sum(scores) / len(scores) if scores else 0.0

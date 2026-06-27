@@ -2,7 +2,7 @@
     
     <!-- Create Category Form inline -->
     <div class="inline-add-form">
-        <form hx-post="/api/profiles/category/create" hx-target="#profiles-tree-root">
+        <form hx-post="/api/presets/category/create" hx-target="#presets-tree-root">
             <div class="input-group">
                 <input type="text" name="name" placeholder="New Category Name..." class="form-control form-control-sm" required>
                 <button type="submit" class="btn btn-sm btn-primary">
@@ -13,7 +13,7 @@
     </div>
     
     <ul class="category-tree">
-        {% for cat, presets in profiles_tree.items() %}
+        {% for cat, presets in presets_tree.items() %}
             <li class="category-tree-item"
                 ondragover="event.preventDefault(); this.classList.add('drag-over')"
                 ondragleave="this.classList.remove('drag-over')"
@@ -24,8 +24,8 @@
                         <strong>{{ cat }}</strong>
                     </span>
                     <button class="btn-action-icon text-danger" 
-                            hx-delete="/api/profiles/category/{{ cat }}" 
-                            hx-target="#profiles-tree-root"
+                            hx-delete="/api/presets/category/{{ cat }}" 
+                            hx-target="#presets-tree-root"
                             hx-confirm="Are you sure you want to delete the category '{{ cat }}' and all its presets?"
                             title="Delete Category">
                         <i class="fa-solid fa-xmark"></i>
@@ -37,16 +37,16 @@
                         <li class="preset-tree-item"
                             draggable="true"
                             ondragstart="dragPreset(event, '{{ cat | replace('\'', '\\\'') }}', '{{ preset | replace('\'', '\\\'') }}')"
-                            hx-get="/api/profiles/config-fields?category={{ cat | urlencode }}&name={{ preset | urlencode }}"
-                            hx-target="#profile-config-container"
+                            hx-get="/api/presets/config-fields?category={{ cat | urlencode }}&name={{ preset | urlencode }}"
+                            hx-target="#preset-config-container"
                             hx-trigger="click">
                             <span class="preset-title">
                                 <i class="fa-solid fa-sliders text-preset"></i>
                                 <span class="preset-name-text">{{ preset }}</span>
                             </span>
                             <button class="btn-action-icon text-danger" 
-                                    hx-delete="/api/profiles/{{ cat | urlencode }}/{{ preset | urlencode }}" 
-                                    hx-target="#profiles-tree-root"
+                                    hx-delete="/api/presets/{{ cat | urlencode }}/{{ preset | urlencode }}" 
+                                    hx-target="#presets-tree-root"
                                     hx-confirm="Delete preset '{{ preset }}'?"
                                     title="Delete Preset"
                                     onclick="event.stopPropagation()">
@@ -58,7 +58,7 @@
                             <span class="text-muted">No presets inside category</span>
                         </li>
                     {% endfor %}
-                    
+                        
                     <!-- Inline Add Preset trigger -->
                     <li class="add-preset-row-item">
                         <button class="btn btn-link btn-xs" onclick="createNewPresetForm('{{ cat }}')">
@@ -108,13 +108,13 @@
             }
             
             // Trigger move API request via HTMX
-            htmx.ajax('POST', '/api/profiles/move', {
+            htmx.ajax('POST', '/api/presets/move', {
                 values: {
                     preset_name: presetName,
                     from_category: sourceCategory,
                     to_category: targetCategory
                 },
-                target: '#profiles-tree-root',
+                target: '#presets-tree-root',
                 swap: 'innerHTML'
             });
             
@@ -124,8 +124,8 @@
             if (originalNameField && categoryField) {
                 if (originalNameField.value === presetName && categoryField.value === sourceCategory) {
                     // Reload the form with the new category and name
-                    htmx.ajax('GET', `/api/profiles/config-fields?category=${encodeURIComponent(targetCategory)}&name=${encodeURIComponent(presetName)}`, {
-                        target: '#profile-config-container',
+                    htmx.ajax('GET', `/api/presets/config-fields?category=${encodeURIComponent(targetCategory)}&name=${encodeURIComponent(presetName)}`, {
+                        target: '#preset-config-container',
                         swap: 'innerHTML'
                     });
                 }
