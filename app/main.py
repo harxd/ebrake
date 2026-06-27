@@ -97,9 +97,6 @@ def render_page(request: Request, template_name: str, context: Dict[str, Any] = 
 async def index(request: Request):
     return RedirectResponse(url="/create-job")
 
-@app.get("/profiles")
-async def redirect_profiles():
-    return RedirectResponse(url="/presets")
 
 @app.get("/create-job", response_class=HTMLResponse)
 async def create_job_page(request: Request):
