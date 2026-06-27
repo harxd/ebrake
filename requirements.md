@@ -246,7 +246,16 @@ This section details how the backend handles duplicate frame detection and autom
   3. **Execution**: Perform the full video transcode using the determined `selected_crf`.
   4. **Final Verification**: Run a final VMAF calculation over the completed file to record `measured_vmaf` in the database.
 
-#### 3. Execution Pipeline & Alignment Gotchas
+#### 3. VMAF Model Selection & Auto-Upscaling
+- **VMAF Models**: Netflix officially distributes two primary VMAF models:
+  - **1080p Model** (`vmaf_v0.6.1.json`): Optimized for 1080p and lower screen displays.
+  - **4K Model** (`vmaf_4k_v0.6.1.json`): Optimized for 4K screen displays (Near or Far viewing distances).
+- **Auto Model Selection**: When using "Auto Near" or "Auto Far", the engine dynamically maps input videos to one of these two categories based on source resolution:
+  - Videos with height > 1080 or width > 1920 (such as 1440p and 4K) resolve to the 4K model (`4k_near` or `4k_far`).
+  - Videos with dimensions <= 1080p (such as 720p, 480p) resolve to the 1080p model.
+- **Auto-Upscaling to Match Model Resolution**: To strictly follow VMAF validation standards (which require inputs to match the subjective training display resolution of the active model), the engine automatically upscales both comparison video streams to the target model resolution (`1920x1080` for the 1080p model, and `3840x2160` for 4K models) using the high-quality **bicubic** scaler (`flags=bicubic`) if the source resolution does not match the model's native resolution.
+
+#### 4. Execution Pipeline & Alignment Gotchas
 When combining duplicate frame detection (`mpdecimate`) and VMAF search, the execution sequence must be carefully controlled to prevent alignment issues. If one stream is decimated and the other is not, frame-by-frame VMAF comparison will mismatch and report incorrect (extremely low) quality scores.
 
 **Pipeline Order**:
