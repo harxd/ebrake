@@ -72,15 +72,16 @@ def server_url(sandbox_env):
     url = f"http://127.0.0.1:{port}"
 
     print(f"\nStarting test Uvicorn server on port {port}...")
+    log_file = open("c:/Users/e/Documents/projects/ebrake/server.log", "w", encoding="utf-8")
     server_proc = subprocess.Popen(
         [
             sys.executable, "-m", "uvicorn", "app.main:app",
-            "--host", "127.0.0.1", "--port", port, "--log-level", "warning"
+            "--host", "127.0.0.1", "--port", port, "--log-level", "info"
         ],
         cwd=str(project_root),
         env=sandbox_env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
         text=True
     )
 

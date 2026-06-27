@@ -97,6 +97,10 @@ def render_page(request: Request, template_name: str, context: Dict[str, Any] = 
 async def index(request: Request):
     return RedirectResponse(url="/create-job")
 
+@app.get("/profiles")
+async def redirect_profiles():
+    return RedirectResponse(url="/presets")
+
 @app.get("/create-job", response_class=HTMLResponse)
 async def create_job_page(request: Request):
     presets_tree = get_all_presets()
@@ -352,7 +356,8 @@ async def api_preset_save(
     sub_mode: str = Form("none"),
     burn_in_track_select: str = Form("default"),
     output_suffix: str = Form(""),
-    container: str = Form("mkv")
+    container: str = Form("mkv"),
+    save_info_file: bool = Form(False)
 ):
     """Save/update preset ebrake TOML file."""
     # Collision check
@@ -394,7 +399,8 @@ async def api_preset_save(
         },
         "output": {
             "output_suffix": output_suffix,
-            "container": container
+            "container": container,
+            "save_info_file": save_info_file
         }
     }
     
@@ -513,7 +519,8 @@ async def api_create_job(
     sub_mode: str = Form("none"),
     burn_in_track_select: str = Form("default"),
     output_suffix: str = Form(""),
-    container: str = Form("mkv")
+    container: str = Form("mkv"),
+    save_info_file: bool = Form(False)
 ):
     """Validate configurations, compute outputs paths (handling collisions), and insert job."""
     in_file = Path(input_path)
@@ -536,7 +543,8 @@ async def api_create_job(
             orig_opt.get("vmaf_model", "1080p") != vmaf_model or
             bool(orig_opt.get("duplicate_frame_detection", False)) != dedup or
             original.get("audio", {}).get("passthrough_codecs", []) != passthrough_codecs or
-            original.get("subtitles", {}).get("mode", "none") != sub_mode):
+            original.get("subtitles", {}).get("mode", "none") != sub_mode or
+            bool(original.get("output", {}).get("save_info_file", False)) != save_info_file):
             is_customized = 1
 
     # Compile the final configuration parameters used
@@ -569,7 +577,8 @@ async def api_create_job(
         },
         "output": {
             "output_suffix": output_suffix,
-            "container": container
+            "container": container,
+            "save_info_file": save_info_file
         }
     }
     

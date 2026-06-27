@@ -432,6 +432,8 @@ def transcode_video(job_id: int):
     """
     global running_job_process
     
+    transcode_start_time = time.time()
+    
     # 1. Fetch Job info
     job = get_job(job_id)
     if not job:
@@ -751,16 +753,28 @@ def transcode_video(job_id: int):
                 # If decimated, get actual output frame count
                 unduplicated_fps = out_meta["nb_frames"] / duration if duration > 0 else source_fps
                 
-            # Update DB to complete
+            # Update DB details first
             update_job(
                 job_id,
-                status="completed",
-                finished_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 duration=int(duration),
                 relative_size=relative_size,
                 result_fps=result_fps,
                 unduplicated_fps=unduplicated_fps,
                 measured_vmaf=measured_vmaf
+            )
+            
+            transcode_time_taken = time.time() - transcode_start_time
+            if bool(out_cfg.get("save_info_file", False)):
+                final_job = get_job(job_id)
+                if final_job:
+                    final_job["finished_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    write_info_txt(final_job, transcode_time_taken)
+                    
+            # Finally, mark completed so the UI transitions
+            update_job(
+                job_id,
+                status="completed",
+                finished_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             )
         else:
             # Failed
@@ -948,3 +962,102 @@ def recover_orphaned_jobs():
             )
             logger.info(f"Re-queued orphaned job {job_id} to pending.")
             resume_queue()
+
+
+def format_size(bytes_size: int) -> str:
+    """Format bytes to human-readable size."""
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if bytes_size < 1024:
+            return f"{bytes_size:.2f} {unit}" if bytes_size > 0 else f"0 {unit}"
+        bytes_size /= 1024
+    return f"{bytes_size:.2f} TB"
+
+def format_duration(seconds: float) -> str:
+    """Format seconds to HH:MM:SS or SS.Ss."""
+    if seconds >= 60:
+        h = int(seconds // 3600)
+        m = int((seconds % 3600) // 60)
+        s = int(seconds % 60)
+        if h > 0:
+            return f"{h:02d}h {m:02d}m {s:02d}s"
+        return f"{m:02d}m {s:02d}s"
+    return f"{seconds:.2f}s"
+
+def write_info_txt(job: dict, transcode_time_taken: float):
+    """Write transcode summary info.txt next to output video."""
+    try:
+        output_path = Path(job["output_path"])
+        input_path = Path(job["input_path"])
+        info_path = output_path.parent / f"{output_path.stem}_info.txt"
+        
+        in_size = input_path.stat().st_size if input_path.exists() else 0
+        out_size = output_path.stat().st_size if output_path.exists() else 0
+        
+        duration_sec = job.get("duration", 0) or 0
+        duration_str = format_duration(duration_sec)
+        transcode_time_str = format_duration(transcode_time_taken)
+        
+        # Calculate speed ratio (video duration / transcode time)
+        speed_ratio = (duration_sec / transcode_time_taken) if transcode_time_taken > 0 else 0.0
+        
+        preset_config = {}
+        if job.get("preset_config"):
+            try:
+                preset_config = json.loads(job["preset_config"])
+            except Exception:
+                pass
+                
+        vid_cfg = preset_config.get("video", {})
+        aud_cfg = preset_config.get("audio", {})
+        sub_cfg = preset_config.get("subtitles", {})
+        opt_cfg = preset_config.get("optimization", {})
+        
+        lines = [
+            "============================================================",
+            "                     ebrake Transcode Info                  ",
+            "============================================================",
+            f"Job ID:         {job.get('id')}",
+            f"Status:         Completed",
+            f"File Name:      {output_path.name}",
+            f"Input Path:     {input_path}",
+            f"Output Path:    {output_path}",
+            f"Started At:     {job.get('started_at')}",
+            f"Completed At:   {job.get('finished_at')}",
+            "",
+            "-------------------- Transcode Statistics -------------------",
+            f"Video Duration:   {duration_str}",
+            f"Transcoding Time: {transcode_time_str}",
+            f"Average Speed:    {speed_ratio:.2f}x",
+            f"Original Size:    {format_size(in_size)} ({in_size} bytes)",
+            f"Output Size:      {format_size(out_size)} ({out_size} bytes)",
+            f"Relative Size:    {job.get('relative_size', 100)}% of original",
+            "",
+            "-------------------- Video Metrics --------------------------",
+            f"Codec:            {vid_cfg.get('codec', 'N/A')}",
+            f"Preset Option:    {vid_cfg.get('preset', 'N/A')}",
+            f"Constant Rate Factor (CRF): {job.get('selected_crf', 'N/A')} (Optimized by VMAF: {'Yes' if float(opt_cfg.get('target_vmaf', 0)) > 0 else 'No'})",
+            f"Source FPS:       {job.get('source_fps', 'N/A')}",
+            f"Output FPS:       {job.get('result_fps', 'N/A')}",
+            f"Unduplicated FPS: {job.get('unduplicated_fps', 'N/A')} (FPS Deduplication: {'Enabled' if opt_cfg.get('duplicate_frame_detection') else 'Disabled'})",
+            f"Final Measured VMAF: {job.get('measured_vmaf', 'N/A')}",
+            "",
+            "-------------------- Audio Settings -------------------------",
+            f"Passthrough Codecs: {', '.join(aud_cfg.get('passthrough_codecs', [])) or 'None'}",
+            f"Fallback Codec:     {aud_cfg.get('fallback_codec', 'N/A')}",
+            f"Fallback Bitrate:   {aud_cfg.get('fallback_bitrate', 'N/A')}",
+            "",
+            "-------------------- Subtitle Settings ----------------------",
+            f"Subtitle Mode:      {job.get('subtitle_mode', 'none')}",
+            f"Selected Track:     {job.get('selected_subtitle_track') if job.get('selected_subtitle_track') is not None else 'None'}",
+            "",
+            "-------------------- FFmpeg Execution Command ---------------",
+            f"{job.get('ffmpeg', 'N/A')}",
+            "============================================================",
+        ]
+        
+        with open(info_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+            
+        logger.info(f"Saved transcode info.txt successfully at {info_path}")
+    except Exception as e:
+        logger.error(f"Failed to write info.txt: {e}")

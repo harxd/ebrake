@@ -99,6 +99,7 @@ Preset TOML content:
 - Output formatting
   - Output suffix: string
   - Container: name (e.g. mkv)
+  - Save info file: boolean (if true, saves a neatly formatted `<video_filename>_info.txt` file containing database metrics and execution logs next to the completed output file)
 
 ### Jobs SQL Schema
 column | type | description

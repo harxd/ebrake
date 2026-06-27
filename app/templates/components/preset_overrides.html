@@ -12,10 +12,17 @@
             <div class="form-group">
                 <label>Container Format</label>
                 <select name="container" class="form-control">
-                    <option value="mkv" {% if preset.output.container == 'mkv' %}selected{% endif %}>MKV (Matroska)</option>
+                    <option value="mkv" {% if preset.output.container == 'mkv' %}selected{% endif %}>Matroska (MKV)</option>
                     <option value="mp4" {% if preset.output.container == 'mp4' %}selected{% endif %}>MP4 (MPEG-4)</option>
                 </select>
             </div>
+        </div>
+        <div class="form-group checkbox-group" style="margin-top: 10px;">
+            <label class="checkbox-container">
+                <input type="checkbox" name="save_info_file" value="true" {% if preset.output.save_info_file %}checked{% endif %}>
+                <span class="checkmark"></span>
+                <span>Save info.txt next to output file</span>
+            </label>
         </div>
     </div>
 

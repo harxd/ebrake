@@ -46,7 +46,8 @@ def init_presets():
             },
             "output": {
                 "output_suffix": "-av1-vmaf",
-                "container": "mkv"
+                "container": "mkv",
+                "save_info_file": False
             }
         }
         
@@ -79,7 +80,8 @@ def init_presets():
             },
             "output": {
                 "output_suffix": "-1080p-fast",
-                "container": "mp4"
+                "container": "mp4",
+                "save_info_file": False
             }
         }
         
