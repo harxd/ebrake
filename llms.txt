@@ -1,0 +1,39 @@
+# ebrake - Project Information for LLMs
+
+## Overview
+`ebrake` is an ffmpeg-based video transcoding web application designed to be distributed as a Docker/Podman container. It allows users to queue media files for transcoding using customized presets and manages the transcoding pipeline.
+
+## Tech Stack
+- **Backend**: Python, FastAPI, Uvicorn
+- **Frontend**: HTML (Jinja2 Templates), HTMX, Alpine.js, Vanilla CSS
+- **Transcoding Engine**: FFmpeg, FFprobe (Subprocess orchestration)
+- **Database**: SQLite (via standard library `sqlite3`)
+- **Configuration/Presets**: TOML (`.ebrake` extension)
+
+## Core Architecture & File Structure
+The main application code resides in the `app/` directory:
+
+- `app/main.py`: The entry point for the FastAPI application. Contains all page routes (UI rendering) and API endpoints (HTMX endpoints for jobs, presets, media scanning). Orchestrates background tasks and worker threads via `lifespan`.
+- `app/config.py`: Manages environment variables and base directory paths (e.g., `APPDATA_DIR`, `MEDIA_DIR`, `PRESETS_DIR`, `DB_DIR`).
+- `app/engine.py`: The core transcoding engine. Handles spawning `ffmpeg` subprocesses, reading probe data (`ffprobe`), VMAF auto-CRF calculations, deduplication dry-runs, and parsing FFmpeg progress.
+- `app/database.py`: Handles SQLite database initialization, job queue management (pending, running, transcode-next priority queue, completed, failed), media file caching, and application settings.
+- `app/presets.py`: Manages reading, writing, moving, and deleting `.ebrake` TOML preset files across categories.
+- `app/scanner.py`: Contains logic for scanning the user's `media/` directory in the background to build a search index/cache.
+- `app/templates/`: Contains Jinja2 templates. Heavily utilizes HTMX for partial page updates (e.g., in `components/`).
+- `static/`: Contains static assets like CSS.
+
+## Key Concepts
+- **Job Queue**: Jobs are submitted to a SQLite database with states (`pending`, `running`, `completed`, `failed`, `cancelled`). There is a standard queue and a prioritized "Transcode Next" queue.
+- **Worker Thread**: A background thread (`start_worker` in `engine.py`) continuously polls the database for `pending` jobs and executes them via `ffmpeg`.
+- **Presets**: Transcoding configurations (codec, crf, vmaf targets, audio fallback, subtitle modes) are stored as TOML files with a `.ebrake` extension in categorized folders under `appdata/presets/`.
+- **VMAF Optimization**: The engine can perform a binary search to find the optimal CRF value that hits a target VMAF score before running the full transcode.
+- **Data Volumes**: 
+  - `appdata/`: Stores the SQLite DB, custom presets, and temporary files.
+  - `media/`: The user's read/write directory containing video files to be transcoded.
+
+## Running Locally for Development
+1. Requires Python 3.12+, `ffmpeg`, and `ffprobe` in PATH.
+2. Setup a virtual environment: `python -m venv .venv` and activate it.
+3. Install dependencies: `pip install -r requirements.txt`.
+4. Run server: `uvicorn app.main:app --host 127.0.0.1 --port 5000`.
+5. Access at `http://127.0.0.1:5000`.
