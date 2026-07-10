@@ -28,8 +28,12 @@ def test_basic_transcoding(page: Page, server_url: str):
     expect(start_btn).to_be_enabled()
     start_btn.click()
     
-    # The app should redirect to /jobs automatically after successful creation
-    expect(page).to_have_url(f"{server_url}/jobs")
+    # Verify we stay on the /create-job page
+    expect(page).to_have_url(f"{server_url}/create-job")
+    
+    # Navigate to Jobs page manually
+    page.click('a[href="/jobs"]')
+    page.wait_for_url(f"{server_url}/jobs")
     
     # Go to Transcode History tab immediately
     page.click('text=Transcode History')
@@ -69,8 +73,12 @@ def test_transcoding_with_info_file(page: Page, server_url: str):
     expect(start_btn).to_be_enabled()
     start_btn.click()
     
-    # The app should redirect to /jobs automatically after successful creation
-    expect(page).to_have_url(f"{server_url}/jobs")
+    # Verify we stay on the /create-job page
+    expect(page).to_have_url(f"{server_url}/create-job")
+    
+    # Navigate to Jobs page manually
+    page.click('a[href="/jobs"]')
+    page.wait_for_url(f"{server_url}/jobs")
     
     # Go to Transcode History tab immediately
     page.click('text=Transcode History')

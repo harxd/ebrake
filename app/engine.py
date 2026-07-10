@@ -261,7 +261,8 @@ def run_vmaf_comparison(
     duplicate_threshold: float = 0.001,
     model_type: str = "1080p",
     video_width: int = 1920,
-    video_height: int = 1080
+    video_height: int = 1080,
+    dist_start_time: Optional[float] = None
 ) -> float:
     """
     Computes VMAF on segment samples.
@@ -302,10 +303,11 @@ def run_vmaf_comparison(
     filters.append(f"{ref_label}{dist_label}libvmaf={model_param}:log_fmt=json:log_path='{escaped_log}'")
     filter_complex = ";".join(filters)
         
+    d_start = dist_start_time if dist_start_time is not None else 0.0
     cmd = [
         "ffmpeg", "-y",
         "-ss", f"{start_time:.3f}", "-t", f"{duration:.3f}", "-i", str(ref_path),
-        "-ss", "0.0", "-t", f"{duration:.3f}", "-i", str(dist_path),
+        "-ss", f"{d_start:.3f}", "-t", f"{duration:.3f}", "-i", str(dist_path),
         "-filter_complex", filter_complex,
         "-f", "null", "-"
     ]
@@ -349,7 +351,8 @@ def run_vmaf_search(
     duplicate_threshold: float = 0.001,
     model_type: str = "1080p",
     video_width: int = 1920,
-    video_height: int = 1080
+    video_height: int = 1080,
+    job_id: Optional[int] = None
 ) -> int:
     """
     Performs Binary Search optimization to find the CRF that yields target VMAF.
@@ -372,6 +375,13 @@ def run_vmaf_search(
     max_iterations = 4
     
     while crf_min <= crf_max and iterations < max_iterations:
+        if job_id is not None:
+            from app.database import get_job
+            j_state = get_job(job_id)
+            if j_state and j_state["status"] == "cancelled":
+                logger.info(f"VMAF search for job {job_id} aborted because job was cancelled.")
+                raise Exception("Job cancelled")
+
         current_crf = int((crf_min + crf_max) / 2)
         iterations += 1
         scores = []
@@ -380,6 +390,25 @@ def run_vmaf_search(
         
         # Test CRF on each segment
         for idx, ts in enumerate(timestamps):
+            if job_id is not None:
+                from app.database import get_job
+                j_state = get_job(job_id)
+                if j_state and j_state["status"] == "cancelled":
+                    logger.info(f"VMAF search for job {job_id} aborted because job was cancelled.")
+                    raise Exception("Job cancelled")
+                
+                # Update progress
+                total_steps = max_iterations * len(timestamps)
+                current_step = (iterations - 1) * len(timestamps) + idx
+                progress_pct = (current_step / total_steps) * 100.0
+                set_running_progress(job_id, {
+                    "phase": "vmaf",
+                    "progress": progress_pct,
+                    "fps": 0.0,
+                    "speed": "N/A",
+                    "eta": f"Iteration {iterations}/{max_iterations} (segment {idx + 1}/{len(timestamps)})",
+                    "ffmpeg_pid": 0
+                })
             temp_out = TEMP_DIR / f"test_segment_{idx}_{current_crf}.mp4"
             
             # Setup transcoding parameters for segment
@@ -521,6 +550,8 @@ def transcode_video(job_id: int):
             
     # Resolve Auto-CRF if requested
     if target_vmaf > 0.0:
+        # Update status to vmaf
+        update_job(job_id, status="vmaf")
         # Run binary search
         vf_string = ",".join(vf_filters) if vf_filters else None
         crf = run_vmaf_search(
@@ -536,9 +567,18 @@ def transcode_video(job_id: int):
             duplicate_threshold=opt_cfg.get("duplicate_threshold", 0.001),
             model_type=opt_cfg.get("vmaf_model", "1080p"),
             video_width=meta.get("width", 1920),
-            video_height=meta.get("height", 1080)
+            video_height=meta.get("height", 1080),
+            job_id=job_id
         )
-        update_job(job_id, selected_crf=crf)
+        
+        # Check if cancelled during VMAF search
+        j_state = get_job(job_id)
+        if j_state and j_state["status"] == "cancelled":
+            logger.info(f"VMAF search for job {job_id} completed but job was already cancelled.")
+            return
+
+        # Update status back to running with selected CRF
+        update_job(job_id, status="running", selected_crf=crf)
     else:
         update_job(job_id, selected_crf=crf)
         
@@ -739,14 +779,19 @@ def transcode_video(job_id: int):
             
             # Final VMAF Calculation
             measured_vmaf = None
-            if duration > 0:
+            calc_final_vmaf = bool(opt_cfg.get("calculate_final_vmaf", True))
+            final_vmaf_mode = str(opt_cfg.get("final_vmaf_mode", "sample"))
+            
+            if duration > 0 and calc_final_vmaf:
                 try:
-                    logger.info("Computing final verification VMAF score...")
-                    # Compute over 60s sample or full (limit to 30s center clip to save verify time in local debugs,
-                    # but let's do the full or 60s segment: e.g. midpoint of video for 60 seconds)
-                    vmaf_sample_start = max(0.0, (duration / 2.0) - 30.0)
-                    vmaf_sample_len = min(60.0, duration)
-                    
+                    logger.info(f"Computing final verification VMAF score (mode: {final_vmaf_mode})...")
+                    if final_vmaf_mode == "full":
+                        vmaf_sample_start = 0.0
+                        vmaf_sample_len = duration
+                    else:
+                        vmaf_sample_start = max(0.0, (duration / 2.0) - 30.0)
+                        vmaf_sample_len = min(60.0, duration)
+                        
                     measured_vmaf = run_vmaf_comparison(
                         ref_path=input_path,
                         dist_path=output_path,
@@ -756,7 +801,8 @@ def transcode_video(job_id: int):
                         duplicate_threshold=opt_cfg.get("duplicate_threshold", 0.001),
                         model_type=opt_cfg.get("vmaf_model", "1080p"),
                         video_width=meta.get("width", 1920),
-                        video_height=meta.get("height", 1080)
+                        video_height=meta.get("height", 1080),
+                        dist_start_time=vmaf_sample_start
                     )
                     logger.info(f"Final measured VMAF: {measured_vmaf}")
                 except Exception as ex:
@@ -808,12 +854,16 @@ def transcode_video(job_id: int):
                 )
     except Exception as e:
         logger.error(f"Error executing transcode: {e}")
-        update_job(
-            job_id,
-            status="failed",
-            failed_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            error=str(e)
-        )
+        job_state = get_job(job_id)
+        if job_state and job_state["status"] == "cancelled":
+            logger.info(f"Job {job_id} was cancelled.")
+        else:
+            update_job(
+                job_id,
+                status="failed",
+                failed_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                error=str(e)
+            )
     finally:
         clear_running_progress(job_id)
         running_job_process = None
@@ -827,7 +877,7 @@ def cancel_running_job(job_id: int) -> bool:
         if not job:
             return False
             
-        if job["status"] == "running":
+        if job["status"] in ("running", "vmaf"):
             # Update database first to mark cancelled
             update_job(
                 job_id,
@@ -935,7 +985,7 @@ def recover_orphaned_jobs():
     
     # Query database for jobs currently 'running'
     with db_conn() as conn:
-        cur = conn.execute("SELECT id, output_path FROM jobs WHERE status = 'running';")
+        cur = conn.execute("SELECT id, output_path FROM jobs WHERE status IN ('running', 'vmaf');")
         orphaned = [dict(row) for row in cur.fetchall()]
         
     if not orphaned:

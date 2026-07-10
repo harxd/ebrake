@@ -5,7 +5,8 @@
     
     <!-- Right Column: Preset Configuration form -->
     <div class="panel card glass">
-        <form id="job-creation-form" hx-post="/api/jobs" hx-swap="none" class="job-creation-form">
+        <form id="job-creation-form" hx-post="/api/jobs" hx-swap="none" class="job-creation-form"
+              hx-on::after-request="if (event.target.id === 'job-creation-form' && event.detail.successful) { flashSaveSuccess('job-submit-btn', '<i class=\'fa-solid fa-circle-play\'></i> Add to Transcode Queue', '<i class=\'fa-solid fa-check\'></i> Added!'); clearSelection(); }">
             
             <!-- Hidden input holding selected file absolute path -->
             <input type="hidden" name="input_path" id="input_path_field" required>
@@ -94,5 +95,13 @@
                 });
             }
         }
+    }
+    
+    function clearSelection() {
+        const inputField = document.getElementById('input_path_field');
+        if (inputField) inputField.value = '';
+        document.querySelectorAll('.video-item').forEach(el => el.classList.remove('selected'));
+        const jobBtn = document.getElementById('job-submit-btn');
+        if (jobBtn) jobBtn.setAttribute('disabled', 'true');
     }
 </script>

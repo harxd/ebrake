@@ -35,7 +35,11 @@
             <div class="running-job-card">
                 <div class="job-meta-row">
                     <span class="job-filename privacy-sensitive" title="{{ job.input_path }}">{{ job.input_path.split('\\')[-1].split('/')[-1] }}</span>
-                    <span class="badge badge-running">RUNNING</span>
+                    {% if job.status == 'vmaf' %}
+                        <span class="badge badge-vmaf">VMAF SEARCH</span>
+                    {% else %}
+                        <span class="badge badge-running">RUNNING</span>
+                    {% endif %}
                 </div>
                 
                 <div class="progress-bar-container">
@@ -223,10 +227,19 @@
 <!-- Out-Of-Band (OOB) Footer status swap -->
 <div id="footer-status-indicator" hx-swap-oob="true">
     {% if running %}
-        <span class="footer-running-indicator">
-            <i class="fa-solid fa-circle-notch fa-spin"></i>
-            Encoding: <strong class="privacy-sensitive">{{ running[0].input_path.split('\\')[-1].split('/')[-1] }}</strong> ({{ running[0].progress | default(0) | round(0) }}%)
-        </span>
+        <div class="footer-running-indicator">
+            <div class="status-line">
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+                {% if running[0].status == 'vmaf' %}
+                    <span>VMAF Search ({{ running[0].progress | default(0) | round(0) }}%)</span>
+                {% else %}
+                    <span>Encoding ({{ running[0].progress | default(0) | round(0) }}%)</span>
+                {% endif %}
+            </div>
+            <div class="filename-line privacy-sensitive" title="{{ running[0].input_path }}">
+                {{ running[0].input_path.split('\\')[-1].split('/')[-1] }}
+            </div>
+        </div>
     {% elif transcode_next or normal_queue %}
         {% if queue_paused %}
             <span class="footer-ready-indicator text-warning">

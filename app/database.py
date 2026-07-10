@@ -29,11 +29,65 @@ def db_conn():
 def init_db():
     """Initialize database tables and default settings."""
     with db_conn() as conn:
+        # Check if migration is needed for 'vmaf' status
+        cur = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='jobs'")
+        row = cur.fetchone()
+        if row:
+            sql = row["sql"]
+            if "'vmaf'" not in sql:
+                logger.info("Migrating jobs table to support 'vmaf' status check constraint...")
+                conn.execute("ALTER TABLE jobs RENAME TO jobs_old;")
+                conn.execute("""
+                CREATE TABLE jobs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'vmaf', 'completed', 'failed', 'cancelled')),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    started_at DATETIME,
+                    finished_at DATETIME,
+                    failed_at DATETIME,
+                    cancelled_at DATETIME,
+                    duration INTEGER,
+                    relative_size INTEGER,
+                    input_path TEXT NOT NULL,
+                    output_path TEXT NOT NULL,
+                    priority INTEGER NOT NULL DEFAULT 0,
+                    transcode_next_position INTEGER UNIQUE,
+                    category TEXT,
+                    preset TEXT,
+                    is_customized BOOLEAN NOT NULL DEFAULT 0 CHECK(is_customized IN (0, 1)),
+                    preset_config TEXT,
+                    subtitle_mode TEXT NOT NULL CHECK(subtitle_mode IN ('none', 'passthrough', 'burn-in')),
+                    selected_subtitle_track INTEGER,
+                    ffmpeg TEXT,
+                    error TEXT,
+                    source_fps REAL,
+                    unduplicated_fps REAL,
+                    result_fps REAL,
+                    target_vmaf REAL,
+                    selected_crf INTEGER,
+                    measured_vmaf REAL
+                );
+                """)
+                conn.execute("""
+                INSERT INTO jobs (id, status, created_at, updated_at, started_at, finished_at, failed_at, cancelled_at, 
+                                  duration, relative_size, input_path, output_path, priority, transcode_next_position, 
+                                  category, preset, is_customized, preset_config, subtitle_mode, selected_subtitle_track, 
+                                  ffmpeg, error, source_fps, unduplicated_fps, result_fps, target_vmaf, selected_crf, measured_vmaf)
+                SELECT id, status, created_at, updated_at, started_at, finished_at, failed_at, cancelled_at, 
+                       duration, relative_size, input_path, output_path, priority, transcode_next_position, 
+                       category, preset, is_customized, preset_config, subtitle_mode, selected_subtitle_track, 
+                       ffmpeg, error, source_fps, unduplicated_fps, result_fps, target_vmaf, selected_crf, measured_vmaf
+                FROM jobs_old;
+                """)
+                conn.execute("DROP TABLE jobs_old;")
+                logger.info("Migrated jobs table successfully.")
+
         # Jobs Table
         conn.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+            status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'vmaf', 'completed', 'failed', 'cancelled')),
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             started_at DATETIME,
@@ -131,9 +185,10 @@ def get_jobs(status: Optional[str] = None) -> List[Dict[str, Any]]:
             SELECT * FROM jobs
             ORDER BY 
               CASE 
-                WHEN status = 'running' THEN 0 
-                WHEN status = 'pending' THEN 1 
-                ELSE 2 
+                WHEN status = 'vmaf' THEN 0
+                WHEN status = 'running' THEN 1 
+                WHEN status = 'pending' THEN 2 
+                ELSE 3 
               END ASC,
               CASE WHEN transcode_next_position IS NOT NULL THEN 0 ELSE 1 END ASC,
               transcode_next_position ASC,

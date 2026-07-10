@@ -105,7 +105,7 @@ Preset TOML content:
 column | type | description
 -------|------|------------
 id | INTEGER | primary key
-status | TEXT | `pending`, `running`, `completed`, `failed`, `cancelled`
+status | TEXT | `pending`, `running`, `vmaf`, `completed`, `failed`, `cancelled`
 created_at | DATETIME | when job was created
 updated_at | DATETIME | when job was updated
 started_at | DATETIME | when job was started

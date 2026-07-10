@@ -79,7 +79,7 @@ def render_page(request: Request, template_name: str, context: Dict[str, Any] = 
     context["queue_paused"] = is_queue_paused()
     
     from app.database import get_jobs
-    context["any_running"] = any(j["status"] == "running" for j in get_jobs())
+    context["any_running"] = any(j["status"] in ("running", "vmaf") for j in get_jobs())
     
     is_htmx = request.headers.get("HX-Request") == "true"
     
@@ -128,7 +128,7 @@ async def jobs_page(request: Request):
     # Fetch queue segments
     jobs = get_jobs()
     pending = [j for j in jobs if j["status"] == "pending"]
-    running = [j for j in jobs if j["status"] == "running"]
+    running = [j for j in jobs if j["status"] in ("running", "vmaf")]
     completed = [j for j in jobs if j["status"] == "completed"]
     failed = [j for j in jobs if j["status"] == "failed"]
     cancelled = [j for j in jobs if j["status"] == "cancelled"]
@@ -342,6 +342,7 @@ async def api_preset_save(
     fps: str = Form("same as source"),
     fps_mode: str = Form("constant"),
     pixel_format: str = Form("yuv420p"),
+    use_vmaf: Optional[str] = Form(None),
     target_vmaf: float = Form(0.0),
     vmaf_min: int = Form(18),
     vmaf_max: int = Form(30),
@@ -354,9 +355,15 @@ async def api_preset_save(
     burn_in_track_select: str = Form("default"),
     output_suffix: str = Form(""),
     container: str = Form("mkv"),
-    save_info_file: bool = Form(False)
+    save_info_file: bool = Form(False),
+    calculate_final_vmaf: bool = Form(False),
+    final_vmaf_mode: str = Form("sample")
 ):
     """Save/update preset ebrake TOML file."""
+    is_vmaf_enabled = (vmaf_model != "off")
+    if not is_vmaf_enabled:
+        target_vmaf = 0.0
+
     # Collision check
     rename_occurred = False
     if original_preset_name and original_preset_name != preset_name:
@@ -382,7 +389,9 @@ async def api_preset_save(
             "vmaf_search_range": [vmaf_min, vmaf_max],
             "duplicate_frame_detection": dedup,
             "duplicate_threshold": 0.001,
-            "vmaf_model": vmaf_model
+            "vmaf_model": vmaf_model,
+            "calculate_final_vmaf": calculate_final_vmaf,
+            "final_vmaf_mode": final_vmaf_mode
         },
         "audio": {
             "passthrough_codecs": passthrough_codecs,
@@ -505,6 +514,7 @@ async def api_create_job(
     fps: str = Form("same as source"),
     fps_mode: str = Form("constant"),
     pixel_format: str = Form("yuv420p"),
+    use_vmaf: Optional[str] = Form(None),
     target_vmaf: float = Form(0.0),
     vmaf_min: int = Form(18),
     vmaf_max: int = Form(30),
@@ -517,9 +527,15 @@ async def api_create_job(
     burn_in_track_select: str = Form("default"),
     output_suffix: str = Form(""),
     container: str = Form("mkv"),
-    save_info_file: bool = Form(False)
+    save_info_file: bool = Form(False),
+    calculate_final_vmaf: bool = Form(False),
+    final_vmaf_mode: str = Form("sample")
 ):
     """Validate configurations, compute outputs paths (handling collisions), and insert job."""
+    is_vmaf_enabled = (vmaf_model != "off")
+    if not is_vmaf_enabled:
+        target_vmaf = 0.0
+
     in_file = Path(input_path)
     if not in_file.exists():
         raise HTTPException(status_code=400, detail="Input file does not exist.")
@@ -560,7 +576,9 @@ async def api_create_job(
             "vmaf_search_range": [vmaf_min, vmaf_max],
             "duplicate_frame_detection": dedup,
             "duplicate_threshold": 0.001,
-            "vmaf_model": vmaf_model
+            "vmaf_model": vmaf_model,
+            "calculate_final_vmaf": calculate_final_vmaf,
+            "final_vmaf_mode": final_vmaf_mode
         },
         "audio": {
             "passthrough_codecs": passthrough_codecs,
@@ -612,8 +630,8 @@ async def api_create_job(
     # Start transcoding worker
     start_worker()
     
-    # Redirect user to the jobs queue page via HTMX header
-    return HTMLResponse(content="", headers={"HX-Redirect": "/jobs"})
+    # Return success response, staying on the same page
+    return HTMLResponse(content="Job successfully added to the transcode queue.")
 
 # JSON Models for sorting reordering payloads
 class ReorderPayload(BaseModel):
@@ -682,7 +700,7 @@ async def render_queues_fragment(request: Request) -> HTMLResponse:
     """Helper to return rendered queues fragment for HTMX updates."""
     jobs = get_jobs()
     pending = [j for j in jobs if j["status"] == "pending"]
-    running = [j for j in jobs if j["status"] == "running"]
+    running = [j for j in jobs if j["status"] in ("running", "vmaf")]
     completed = [j for j in jobs if j["status"] == "completed"]
     failed = [j for j in jobs if j["status"] == "failed"]
     cancelled = [j for j in jobs if j["status"] == "cancelled"]
@@ -876,7 +894,8 @@ async def api_tool_vmaf_compare(
                 use_mpdecimate=dedup,
                 model_type=vmaf_model,
                 video_width=ref_meta.get("width", 1920),
-                video_height=ref_meta.get("height", 1080)
+                video_height=ref_meta.get("height", 1080),
+                dist_start_time=start_time
             )
             vmaf_duration = duration
             vmaf_start = start_time
@@ -896,7 +915,8 @@ async def api_tool_vmaf_compare(
                     use_mpdecimate=dedup,
                     model_type=vmaf_model,
                     video_width=ref_meta.get("width", 1920),
-                    video_height=ref_meta.get("height", 1080)
+                    video_height=ref_meta.get("height", 1080),
+                    dist_start_time=ts
                 )
                 scores.append(score)
             vmaf_score = sum(scores) / len(scores) if scores else 0.0

@@ -31,7 +31,7 @@
         <h4 class="section-title"><i class="fa-solid fa-video"></i> Video Encoding</h4>
         
         <div class="form-group">
-            <label>Codec</label>
+            <label>Codec <i class="fa-regular fa-circle-question info-icon" title="Video compression format.&#10;• SVT-AV1: Next-generation, highest efficiency.&#10;• H.265: High efficiency, widely supported.&#10;• H.264: Maximum compatibility with older devices."></i></label>
             <select name="codec" class="form-control" onchange="togglePresetOptions(this.value)">
                 <option value="libsvtav1" {% if preset.video.codec == 'libsvtav1' %}selected{% endif %}>SVT-AV1 (libsvtav1)</option>
                 <option value="libx265" {% if preset.video.codec == 'libx265' %}selected{% endif %}>H.265 (libx265)</option>
@@ -41,20 +41,30 @@
         
         <div class="form-row">
             <div class="form-group">
-                <label>Preset</label>
-                <input type="text" name="preset_val" id="preset_input" class="form-control" value="{{ preset.video.preset }}" placeholder="e.g. 6 or fast">
+                <label>Preset <i class="fa-regular fa-circle-question info-icon" title="Determines encoding speed vs compression efficiency.&#10;• AV1 (libsvtav1): 0 to 13 (recommended: 6 for standard, 8 for fast, 4/5 for high quality).&#10;• H.264/H.265: ultrafast to veryslow (recommended: medium or slow)."></i></label>
+                <select name="preset_val" id="preset_input" class="form-control">
+                    {% if preset.video.codec == 'libsvtav1' %}
+                        {% for i in range(14) %}
+                            <option value="{{ i }}" {% if preset.video.preset | string == i | string %}selected{% endif %}>{{ i }}</option>
+                        {% endfor %}
+                    {% else %}
+                        {% for p in ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow', 'placebo'] %}
+                            <option value="{{ p }}" {% if preset.video.preset | string == p | string %}selected{% endif %}>{{ p }}</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
             </div>
             
             <div class="form-group">
-                <label>CRF (Constant Rate Factor)</label>
-                <input type="number" name="crf" class="form-control" value="{{ preset.video.crf }}" min="0" max="51">
-                <span class="input-tip">Ignored if Auto-VMAF is active</span>
+                <label>CRF (Constant Rate Factor) <i class="fa-regular fa-circle-question info-icon" title="Controls quality level (0 to 51). Lower values mean higher quality but larger file sizes.&#10;• Recommended AV1/H.265: 22-26.&#10;• Recommended H.264: 18-22."></i></label>
+                <input type="number" name="crf" class="form-control crf-input" value="{{ preset.video.crf }}" min="0" max="51">
+                <span class="input-tip crf-input-tip">Ignored if Auto-VMAF is active</span>
             </div>
         </div>
         
         <div class="form-row">
             <div class="form-group">
-                <label>FPS (Frame Rate)</label>
+                <label>FPS (Frame Rate) <i class="fa-regular fa-circle-question info-icon" title="Number of frames encoded per second. Same as Source keeps original video frame rate."></i></label>
                 <select name="fps" class="form-control">
                     <option value="same as source" {% if preset.video.fps == 'same as source' %}selected{% endif %}>Same as Source</option>
                     <option value="23.976" {% if preset.video.fps == '23.976' %}selected{% endif %}>23.976 fps</option>
@@ -67,7 +77,7 @@
             </div>
             
             <div class="form-group">
-                <label>FPS Mode</label>
+                <label>FPS Mode <i class="fa-regular fa-circle-question info-icon" title="• Constant (CFR): Fixes frame rate (recommended for media players/editors).&#10;• Variable (VFR): Adapts rate dynamically (recommended for screen recordings)."></i></label>
                 <select name="fps_mode" class="form-control">
                     <option value="constant" {% if preset.video.fps_mode == 'constant' %}selected{% endif %}>Constant (CFR)</option>
                     <option value="variable" {% if preset.video.fps_mode == 'variable' %}selected{% endif %}>Variable (VFR)</option>
@@ -76,7 +86,7 @@
         </div>
         
         <div class="form-group">
-            <label>Pixel Format</label>
+            <label>Pixel Format <i class="fa-regular fa-circle-question info-icon" title="Color bit-depth representation.&#10;• yuv420p10le: 10-bit color, recommended for AV1/H.265 to prevent banding and support HDR.&#10;• yuv420p: 8-bit color, standard compatibility."></i></label>
             <select name="pixel_format" class="form-control">
                 <option value="same as source" {% if preset.video.pixel_format == 'same as source' %}selected{% endif %}>Same as Source</option>
                 <option value="yuv420p" {% if preset.video.pixel_format == 'yuv420p' %}selected{% endif %}>yuv420p (8-bit)</option>
@@ -156,42 +166,55 @@
     <div class="panel-section">
         <h4 class="section-title"><i class="fa-solid fa-bolt"></i> Extras & Optimizations</h4>
         
+        {% set vmaf_enabled = preset.optimization.target_vmaf and preset.optimization.target_vmaf > 0.0 %}
         <div class="form-row">
             <div class="form-group">
-                <label>Target VMAF (Auto-CRF Selection)</label>
-                <input type="number" step="0.1" name="target_vmaf" class="form-control" value="{{ preset.optimization.target_vmaf }}" placeholder="e.g. 95.0 (0 to disable)">
-                <span class="input-tip">Searches CRF range automatically to match quality.</span>
+                <label>VMAF Auto-CRF <i class="fa-regular fa-circle-question info-icon" title="VMAF viewing distance evaluation model.&#10;• Off: Disables VMAF Auto-CRF (uses fixed CRF instead).&#10;• 1080p: Standard TV/monitor viewing.&#10;• 4k_near/far: 4K display viewing models.&#10;• Auto: Detects 4K input dynamically."></i></label>
+                <select name="vmaf_model" id="vmaf_model_select" class="form-control" onchange="toggleVmafModelFields(this)">
+                    <option value="off" {% if not vmaf_enabled %}selected{% endif %}>Disabled</option>
+                    <option value="auto_near" {% if vmaf_enabled and preset.optimization.vmaf_model == 'auto_near' %}selected{% endif %}>Auto Near</option>
+                    <option value="auto_far" {% if vmaf_enabled and preset.optimization.vmaf_model == 'auto_far' %}selected{% endif %}>Auto Far</option>
+                    <option value="1080p" {% if vmaf_enabled and (preset.optimization.vmaf_model == '1080p' or not preset.optimization.vmaf_model) %}selected{% endif %}>1080p (Standard / 3H)</option>
+                    <option value="4k_near" {% if vmaf_enabled and preset.optimization.vmaf_model == '4k_near' %}selected{% endif %}>4K Near (1.5H display height)</option>
+                    <option value="4k_far" {% if vmaf_enabled and preset.optimization.vmaf_model == '4k_far' %}selected{% endif %}>4K Far (3H display height / 1080p acuity)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Target VMAF <i class="fa-regular fa-circle-question info-icon" title="Target visual quality score (0 to 100). Engine tests source segments and searches for the optimal CRF to hit this score.&#10;• Recommended: 93.0 to 95.0."></i></label>
+                <input type="number" step="0.1" name="target_vmaf" class="form-control vmaf-target-input" value="{{ preset.optimization.target_vmaf }}" placeholder="e.g. 95.0" {% if not vmaf_enabled %}disabled style="opacity: 0.5; pointer-events: none;"{% endif %}>
             </div>
             
             <div class="form-group">
-                <label>VMAF Model</label>
-                <select name="vmaf_model" class="form-control">
-                    <option value="auto_near" {% if preset.optimization.vmaf_model == 'auto_near' %}selected{% endif %}>Auto Near (Detect 4K)</option>
-                    <option value="auto_far" {% if preset.optimization.vmaf_model == 'auto_far' %}selected{% endif %}>Auto Far (Detect 4K)</option>
-                    <option value="1080p" {% if preset.optimization.vmaf_model == '1080p' or not preset.optimization.vmaf_model %}selected{% endif %}>1080p (Standard / 3H)</option>
-                    <option value="4k_near" {% if preset.optimization.vmaf_model == '4k_near' %}selected{% endif %}>4K Near (1.5H display height)</option>
-                    <option value="4k_far" {% if preset.optimization.vmaf_model == '4k_far' %}selected{% endif %}>4K Far (3H display height / 1080p acuity)</option>
-                </select>
-            </div>
-        </div>
-        
-        <div class="form-row">
-            <div class="form-group">
                 <label>VMAF Min CRF</label>
-                <input type="number" name="vmaf_min" class="form-control" value="{{ preset.optimization.vmaf_search_range[0] | default(18) }}">
+                <input type="number" name="vmaf_min" class="form-control" value="{{ preset.optimization.vmaf_search_range[0] | default(18) }}" {% if not vmaf_enabled %}disabled style="opacity: 0.5; pointer-events: none;"{% endif %}>
             </div>
             
             <div class="form-group">
                 <label>VMAF Max CRF</label>
-                <input type="number" name="vmaf_max" class="form-control" value="{{ preset.optimization.vmaf_search_range[1] | default(30) }}">
+                <input type="number" name="vmaf_max" class="form-control" value="{{ preset.optimization.vmaf_search_range[1] | default(30) }}" {% if not vmaf_enabled %}disabled style="opacity: 0.5; pointer-events: none;"{% endif %}>
             </div>
         </div>
         
-        <div class="form-group checkbox-group">
+        <div class="form-group final-vmaf-row" style="margin-top: 15px; margin-bottom: 15px;">
+            <label>Final VMAF Calculation <i class="fa-regular fa-circle-question info-icon" title="Enables calculating final VMAF score for the output file after transcoding is complete.&#10;• Snippet: Computes VMAF on a 60-second midpoint clip (fast validation).&#10;• Full: Computes VMAF on the entire video length (very thorough, slower)."></i></label>
+            <div class="inline-checkbox-select" style="display: flex; align-items: center; gap: 10px;">
+                <label class="checkbox-container" style="margin-bottom: 0; width: 24px; padding-left: 28px;">
+                    <input type="checkbox" name="calculate_final_vmaf" value="true" {% if preset.optimization.calculate_final_vmaf | default(true, true) %}checked{% endif %} onchange="toggleFinalVmafMode(this)">
+                    <span class="checkmark"></span>
+                </label>
+                <select name="final_vmaf_mode" id="final_vmaf_mode_select" class="form-control" style="flex: 1; {% if not preset.optimization.calculate_final_vmaf | default(true, true) %}opacity: 0.5; pointer-events: none;{% endif %}">
+                    <option value="sample" {% if preset.optimization.final_vmaf_mode | default('sample') == 'sample' %}selected{% endif %}>Snippet (60-second midpoint sample)</option>
+                    <option value="full" {% if preset.optimization.final_vmaf_mode | default('sample') == 'full' %}selected{% endif %}>Full Video (Thorough calculation)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group checkbox-group" style="margin-top: 15px;">
             <label class="checkbox-container">
                 <input type="checkbox" name="dedup" value="true" {% if preset.optimization.duplicate_frame_detection %}checked{% endif %}>
                 <span class="checkmark"></span>
-                <span>Enable FPS Deduplication (Drop identical frames)</span>
+                <span>Enable FPS Deduplication (Drop identical frames) <i class="fa-regular fa-circle-question info-icon" title="Filters out duplicate frames (via mpdecimate) to optimize compression. Recommended for animations or static slides."></i></span>
             </label>
         </div>
     </div>
@@ -200,15 +223,28 @@
 
 <script>
     function togglePresetOptions(codec) {
-        const presetInput = document.getElementById('preset_input');
-        if (!presetInput) return;
+        const selectEl = document.getElementById('preset_input');
+        if (!selectEl) return;
+        
+        selectEl.innerHTML = '';
         
         if (codec === 'libsvtav1') {
-            presetInput.value = '6';
-            presetInput.placeholder = 'e.g. 0 to 13 (6 is standard)';
+            for (let i = 0; i <= 13; i++) {
+                const opt = document.createElement('option');
+                opt.value = i.toString();
+                opt.textContent = i.toString();
+                if (i === 6) opt.selected = true;
+                selectEl.appendChild(opt);
+            }
         } else {
-            presetInput.value = 'fast';
-            presetInput.placeholder = 'e.g. fast, medium, slow';
+            const presets = ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow', 'placebo'];
+            presets.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p;
+                opt.textContent = p;
+                if (p === 'fast') opt.selected = true;
+                selectEl.appendChild(opt);
+            });
         }
     }
     
@@ -218,4 +254,79 @@
             wrapper.style.display = mode === 'burn-in' ? 'block' : 'none';
         }
     }
+
+    function toggleFinalVmafMode(checkbox) {
+        const grid = checkbox.closest('.panel-section');
+        if (!grid) return;
+        const select = grid.querySelector('#final_vmaf_mode_select');
+        if (select) {
+            if (checkbox.checked) {
+                select.style.opacity = '1';
+                select.style.pointerEvents = 'auto';
+            } else {
+                select.style.opacity = '0.5';
+                select.style.pointerEvents = 'none';
+            }
+        }
+    }
+
+    function toggleVmafModelFields(select) {
+        const grid = select.closest('.override-grid');
+        if (!grid) return;
+        
+        const enabled = select.value !== 'off';
+        const crfInput = grid.querySelector('.crf-input');
+        const crfTip = grid.querySelector('.crf-input-tip');
+        
+        const targetInput = grid.querySelector('.vmaf-target-input');
+        const minInput = grid.querySelector('input[name="vmaf_min"]');
+        const maxInput = grid.querySelector('input[name="vmaf_max"]');
+        
+        const vmafInputs = [targetInput, minInput, maxInput];
+        vmafInputs.forEach(input => {
+            if (input) {
+                input.disabled = !enabled;
+                if (!enabled) {
+                    input.style.opacity = '0.5';
+                    input.style.pointerEvents = 'none';
+                } else {
+                    input.style.opacity = '1';
+                    input.style.pointerEvents = 'auto';
+                }
+            }
+        });
+        
+        if (crfInput) {
+            if (enabled) {
+                crfInput.classList.add('disabled-input');
+                crfInput.style.opacity = '0.5';
+                crfInput.style.pointerEvents = 'none';
+                if (crfTip) crfTip.textContent = "Ignored when VMAF Auto-CRF is enabled";
+            } else {
+                crfInput.classList.remove('disabled-input');
+                crfInput.style.opacity = '1';
+                crfInput.style.pointerEvents = 'auto';
+                if (crfTip) crfTip.textContent = "Used for constant quality encoding";
+            }
+        }
+        if (enabled && targetInput && (!targetInput.value || parseFloat(targetInput.value) <= 0)) {
+            targetInput.value = '95.0';
+        }
+    }
+
+    // Run initialization on load
+    (function() {
+        document.querySelectorAll('.panel-section').forEach(function(section) {
+            const checkbox = section.querySelector('input[name="calculate_final_vmaf"]');
+            if (checkbox) {
+                toggleFinalVmafMode(checkbox);
+            }
+        });
+        document.querySelectorAll('.override-grid').forEach(function(grid) {
+            const select = grid.querySelector('#vmaf_model_select');
+            if (select) {
+                toggleVmafModelFields(select);
+            }
+        });
+    })();
 </script>

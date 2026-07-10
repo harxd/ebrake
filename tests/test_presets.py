@@ -20,11 +20,37 @@ def test_preset_management(page: Page, server_url: str):
     page.fill('input[name="preset_name"]', "Bob Preset")
     page.fill('input[name="output_suffix"]', "_bob")
     page.select_option('select[name="codec"]', 'libx265') # Change video codec
+
+    # Verify checkbox is unchecked by default
+    vmaf_select = page.locator('#vmaf_model_select')
+    expect(vmaf_select).to_have_value('off')
+
+    # Select 1080p to enable VMAF
+    page.select_option('#vmaf_model_select', '1080p')
+    expect(vmaf_select).to_have_value('1080p')
+
     page.click('#preset-save-btn')
     
     # Wait for it to appear in the tree
     bob_preset_locator = page.locator('.preset-name-text:has-text("Bob Preset")')
     expect(bob_preset_locator).to_be_visible()
+
+    # Click on the preset in the tree to reload its details
+    bob_preset_locator.click()
+    page.wait_for_timeout(300) # Wait for HTMX swap
+
+    # Verify VMAF select is still set to 1080p after saving and reloading
+    expect(vmaf_select).to_have_value('1080p')
+
+    # Disable VMAF and save again
+    page.select_option('#vmaf_model_select', 'off')
+    page.click('#preset-save-btn')
+    page.wait_for_timeout(300)
+
+    # Click to reload and verify it is disabled
+    bob_preset_locator.click()
+    page.wait_for_timeout(300)
+    expect(vmaf_select).to_have_value('off')
     
     # 3. Create Category "Alice"
     page.fill('input[name="name"][placeholder="New Category Name..."]', "Alice")
